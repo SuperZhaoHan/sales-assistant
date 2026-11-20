@@ -1,0 +1,8 @@
+title = "python-tools gitleaks config"
+
+[allowlist]
+description = "Allow placeholders and fake credentials used only in tests."
+paths = [
+  '''tests/.*''',
+  '''\.env\.example''',
+]

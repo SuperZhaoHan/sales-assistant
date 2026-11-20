@@ -1,0 +1,40 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-and-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: End-to-end and contract tests
+        run: pytest -m "e2e or contract"
+      - name: Dependency audit
+        run: pip-audit
+
+  # Enable this job only after configuring a dedicated, budget-capped CI key.
+  # real-llm-contract:
+  #   runs-on: ubuntu-latest
+  #   environment: ci-llm
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-python@v5
+  #       with:
+  #         python-version: "3.13"
+  #     - run: pip install -e ".[dev,anthropic]"
+  #     - run: pytest -m llm
+  #       env:
+  #         APP_ENV: test
+  #         LLM_ANTHROPIC_API_KEY: ${{ secrets.LLM_ANTHROPIC_API_KEY }}

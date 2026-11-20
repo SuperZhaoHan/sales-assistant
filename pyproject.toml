@@ -1,0 +1,126 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "python-tools"
+version = "0.1.0"
+description = "Production-oriented Python service base with config, logging, errors, testing, risk control, LLM gateway and secret isolation."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "python-tools" }]
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn>=0.34.0",
+  "pydantic>=2.10.0",
+  "pydantic-settings>=2.7.0",
+  "PyYAML>=6.0.2",
+  "structlog>=25.1.0",
+  "httpx>=0.28.0",
+  "prometheus-client>=0.21.0",
+  "python-dotenv>=1.0.1",
+]
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=2.0.0"]
+redis = ["redis>=5.2.0"]
+vault = ["hvac>=2.3.0"]
+aws = ["boto3>=1.35.0"]
+otel = [
+  "opentelemetry-api>=1.29.0",
+  "opentelemetry-sdk>=1.29.0",
+  "opentelemetry-exporter-otlp>=1.29.0",
+  "opentelemetry-instrumentation-fastapi>=0.50b0",
+  "opentelemetry-instrumentation-httpx>=0.50b0",
+]
+dev = [
+  "pytest>=8.3.0",
+  "pytest-asyncio>=0.25.0",
+  "pytest-cov>=6.0.0",
+  "respx>=0.22.0",
+  "ruff>=0.9.0",
+  "mypy>=1.14.0",
+  "types-PyYAML>=6.0.12",
+  "bandit>=1.8.0",
+  "pip-audit>=2.7.0",
+  "pre-commit>=4.0.0",
+  "build>=1.2.0",
+]
+
+[project.scripts]
+python-tools = "app.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/app"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src",
+  "/tests",
+  "/config",
+  "/deploy",
+  "/scripts",
+  "/README.md",
+  "/pyproject.toml",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "ASYNC"]
+ignore = ["B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.12"
+check_untyped_defs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+ignore_missing_imports = true
+exclude = ["tests", ".venv"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra --strict-markers"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+  "unit: fast, no network or external I/O",
+  "integration: uses app/adapters, may use local services",
+  "e2e: end-to-end flows with fake external providers",
+  "contract: external API contract tests",
+  "slow: slow tests",
+  "llm: tests that touch LLM adapters",
+  "security: security-focused regression tests",
+]
+
+[tool.coverage.run]
+source = ["src/app"]
+branch = true
+omit = [
+  "src/app/asgi.py",
+  "src/app/llm/providers/anthropic.py",
+  "src/app/security/secrets/vault.py",
+  "src/app/security/secrets/aws.py",
+]
+
+[tool.coverage.report]
+fail_under = 75
+show_missing = true
+skip_covered = true
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", "build", "dist"]

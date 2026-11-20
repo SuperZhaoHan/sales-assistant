@@ -1,0 +1,34 @@
+logging:
+  level: INFO
+  json_format: true
+
+server:
+  docs_enabled: false
+  cors_origins:
+    - https://staging.example.com
+
+secrets:
+  provider: file
+  file_dir: /run/secrets
+  required:
+    - llm/anthropic_api_key
+
+llm:
+  provider: anthropic
+  model: claude-opus-5-5
+  base_url: null
+  allowed_models:
+    - claude-opus-5-5
+    - claude-sonnet-5-5
+  thinking: adaptive
+
+risk:
+  fail_closed: true
+  quota:
+    enabled: true
+
+redis:
+  enabled: true
+
+observability:
+  otel_enabled: true

@@ -1,0 +1,41 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: local
+      APP_CONFIG_DIR: /app/config
+      APP__LLM__PROVIDER: fake
+      APP__LLM__MODEL: fake-model
+      APP__OBSERVABILITY__OTEL_ENABLED: "false"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2)"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+# Staging/prod example:
+#
+#   environment:
+#     APP_ENV: staging
+#   volumes:
+#     - /run/secrets/llm/anthropic_api_key:/run/secrets/llm/anthropic_api_key:ro
+#   read_only: true
+#   security_opt: ["no-new-privileges:true"]

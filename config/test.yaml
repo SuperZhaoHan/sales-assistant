@@ -1,0 +1,23 @@
+logging:
+  level: INFO
+  json_format: false
+  access_log: false
+
+server:
+  docs_enabled: false
+
+secrets:
+  provider: env
+  required: []
+
+llm:
+  provider: fake
+  model: fake-model
+
+risk:
+  enabled: false
+  fail_closed: false
+
+observability:
+  metrics_enabled: false
+  otel_enabled: false
