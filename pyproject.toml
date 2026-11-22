@@ -3,13 +3,13 @@ requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
-name = "python-tools"
+name = "sales-assistant"
 version = "0.1.0"
 description = "Production-oriented Python service base with config, logging, errors, testing, risk control, LLM gateway and secret isolation."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
-authors = [{ name = "python-tools" }]
+authors = [{ name = "sales-assistant" }]
 dependencies = [
   "fastapi>=0.115.0",
   "uvicorn>=0.34.0",
@@ -49,7 +49,7 @@ dev = [
 ]
 
 [project.scripts]
-python-tools = "app.cli:main"
+sales-assistant = "app.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/app"]

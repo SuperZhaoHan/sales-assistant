@@ -30,7 +30,7 @@ class RuntimeSettings(BaseSettings):
 class AppMeta(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: str = "python-tools"
+    name: str = "sales-assistant"
     version: str = "0.1.0"
 
 

@@ -1,4 +1,4 @@
-title = "python-tools gitleaks config"
+title = "sales-assistant gitleaks config"
 
 [allowlist]
 description = "Allow placeholders and fake credentials used only in tests."

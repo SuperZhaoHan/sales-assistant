@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: python-tools
+  name: sales-assistant
   labels:
-    app: python-tools
+    app: sales-assistant
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: python-tools
+      app: sales-assistant
   template:
     metadata:
       labels:
-        app: python-tools
+        app: sales-assistant
     spec:
       securityContext:
         runAsNonRoot: true
@@ -21,7 +21,7 @@ spec:
         fsGroup: 999
       containers:
         - name: app
-          image: ghcr.io/your-org/python-tools:latest
+          image: ghcr.io/your-org/sales-assistant:latest
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -69,10 +69,10 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: python-tools-config
+            name: sales-assistant-config
         - name: secrets
           secret:
-            secretName: python-tools-secrets
+            secretName: sales-assistant-secrets
             items:
               - key: anthropic_api_key
                 path: llm/anthropic_api_key

@@ -87,7 +87,7 @@ placeholders for `kubectl`/Helm; replace them with your platform commands.
 ## Rollback
 
 ```bash
-kubectl rollout undo deployment/python-tools
+kubectl rollout undo deployment/sales-assistant
 ```
 
 Database migrations, if added later, must be backward compatible for one

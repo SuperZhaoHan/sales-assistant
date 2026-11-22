@@ -1,4 +1,4 @@
-# python-tools
+# sales-assistant
 
 > 环境要求：Python 3.15（Makefile 使用 `python3.15`；可自行调整）。项目声明的最低版本见 `pyproject.toml`。
 
@@ -226,7 +226,7 @@ pre-commit run --all-files
 ## Docker
 
 ```bash
-docker build -f deploy/Dockerfile -t python-tools:local .
+docker build -f deploy/Dockerfile -t sales-assistant:local .
 docker compose -f deploy/docker-compose.yml up --build
 ```
 
@@ -257,8 +257,8 @@ docker compose -f deploy/docker-compose.yml up --build
 ## 命令行
 
 ```bash
-.venv/bin/python-tools --help
-.venv/bin/python-tools --env test check-config
-.venv/bin/python-tools --env staging check-secrets
-.venv/bin/python-tools serve --reload
+.venv/bin/sales-assistant --help
+.venv/bin/sales-assistant --env test check-config
+.venv/bin/sales-assistant --env staging check-secrets
+.venv/bin/sales-assistant serve --reload
 ```

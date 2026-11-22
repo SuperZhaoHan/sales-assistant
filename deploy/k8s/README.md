@@ -3,7 +3,7 @@
 1. Create the config map from the versioned config files:
 
 ```bash
-kubectl create configmap python-tools-config \
+kubectl create configmap sales-assistant-config \
   --from-file=base.yaml=config/base.yaml \
   --from-file=prod.yaml=config/prod.yaml
 ```
@@ -12,7 +12,7 @@ kubectl create configmap python-tools-config \
    `secret://llm/anthropic_api_key` in `config/prod.yaml`:
 
 ```bash
-kubectl create secret generic python-tools-secrets \
+kubectl create secret generic sales-assistant-secrets \
   --from-file=anthropic_api_key=./secrets/anthropic_api_key
 ```
 
