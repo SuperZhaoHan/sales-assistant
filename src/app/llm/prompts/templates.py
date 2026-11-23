@@ -24,8 +24,8 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Mapping
 
 from app.core.errors import ValidationError
 
@@ -45,7 +45,12 @@ class PromptTemplate:
     description: str = field(default="")
 
     def __post_init__(self) -> None:
-        for label, value in (("role", self.role), ("task", self.task), ("output_format", self.output_format)):
+        sections = (
+            ("role", self.role),
+            ("task", self.task),
+            ("output_format", self.output_format),
+        )
+        for label, value in sections:
             if not value.strip():
                 raise ValidationError(
                     f"prompt template {self.name}{self.version} 缺少 {label}",
@@ -92,7 +97,15 @@ class PromptTemplate:
                 },
             )
 
-        lines: list[str] = ["【角色】", _sub(self.role).strip(), "", "【任务】", _sub(self.task).strip(), "", "【约束】"]
+        lines: list[str] = [
+            "【角色】",
+            _sub(self.role).strip(),
+            "",
+            "【任务】",
+            _sub(self.task).strip(),
+            "",
+            "【约束】",
+        ]
         for index, item in enumerate(self.constraints, start=1):
             lines.append(f"{index}. {_sub(item).strip()}")
         lines += ["", "【输出格式】", _sub(self.output_format).strip()]
@@ -173,7 +186,11 @@ def get_template(name: str, version: str | None = None) -> PromptTemplate:
             return template
     raise ValidationError(
         f"提示词模板不存在该版本：{name}{version}",
-        details={"template": name, "version": version, "available": [t.version for t in candidates]},
+        details={
+            "template": name,
+            "version": version,
+            "available": [t.version for t in candidates],
+        },
     )
 
 
