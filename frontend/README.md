@@ -59,6 +59,7 @@ docker compose up --build
 
 ## 已知边界
 
+- **upstream 在 nginx 启动时解析**：`proxy_pass` 里是静态主机名，所以后端 Service / 容器必须先存在（compose 有 `depends_on`，k8s 要先 apply 后端的 Service）。如果后端 DNS 还没就绪，容器会 `host not found in upstream` 启动失败，靠重启恢复——这是 nginx 的固有行为，不是配置错误。
 - 会话状态全在内存（刷新即清空），没有做多标签页同步；
 - 没有登录，`subject_id` 固定写 `web-console`；接真实鉴权时应由后端从令牌里取，**不能信前端传的值**；
 - 没有做流式 Markdown 渲染，模板输出的是固定三段纯文本，用 `pre-wrap` 足够。

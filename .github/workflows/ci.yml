@@ -100,9 +100,14 @@ jobs:
       - name: Validate nginx config
         # 前端没有构建步骤，这里只校验最容易写错的两件事：
         # 配置能否被 nginx 解析 + SSE 必需的 proxy_buffering off 是否还在。
+        #
+        # --add-host 是必须的：nginx 在启动时就解析 proxy_pass 里的主机名，
+        # CI 容器里没有 backend 这个容器，解析失败会直接 nginx -t 报 emerg。
+        # 这里把 backend 指到一个占位 IP，只为让语法检查跑通，不涉及真实连通性。
         run: |
           grep -q "proxy_buffering off" templates/default.conf.template
           docker run --rm \
+            --add-host backend:127.0.0.1 \
             -e BACKEND_HOST=backend -e BACKEND_PORT=8000 \
             -v "$PWD/templates:/etc/nginx/templates:ro" \
             nginx:1.27-alpine nginx -t
