@@ -1,0 +1,70 @@
+server {
+    listen 80;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # 前端容器自己的健康检查，不依赖后端是否就绪：
+    # 「前端进程活着」和「后端能回答」是两件事，混在一起会导致误判重启。
+    location = /healthz {
+        access_log off;
+        add_header Content-Type text/plain;
+        return 200 "ok\n";
+    }
+
+    # 静态资源：文件名带版本时可以直接长缓存。
+    location /assets/ {
+        expires 1h;
+        add_header Cache-Control "public, max-age=3600";
+        try_files $uri =404;
+    }
+
+    # 反向代理到后端。前端与后端同源，因此后端不需要开 CORS。
+    #
+    # ${BACKEND_HOST} / ${BACKEND_PORT} 由容器启动时的 envsubst 注入
+    # （nginx 镜像自带 /etc/nginx/templates 机制），所以同一份配置能同时用于：
+    #   - compose：BACKEND_HOST=backend
+    #   - k8s：BACKEND_HOST=sales-followup-agent（Service 名）
+    location /v1/ {
+        proxy_pass http://${BACKEND_HOST}:${BACKEND_PORT}/v1/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+
+        # SSE 关键三行：不缓冲、不缓存、长超时。
+        # 少了 proxy_buffering off，流式回答会被 nginx 攒成一坨再一次性吐出来。
+        proxy_buffering off;
+        proxy_cache off;
+        chunked_transfer_encoding on;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+
+        # 客户端取消（关闭页面 / 点停止）要能传到后端，否则后端会白跑一次。
+        proxy_ignore_client_abort off;
+    }
+
+    location /health/ {
+        proxy_pass http://${BACKEND_HOST}:${BACKEND_PORT}/health/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_read_timeout 10s;
+    }
+
+    location = / {
+        try_files /index.html =404;
+        add_header Cache-Control "no-cache";
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 与后端一致的安全响应头，避免「后端加固了、前端漏了」。
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "no-referrer" always;
+}

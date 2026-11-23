@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>私域销售跟进 Agent</title>
+    <link rel="stylesheet" href="./assets/styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ctext x='16' y='22' font-size='16' font-family='sans-serif' fill='white' text-anchor='middle'%3ESF%3C/text%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">SF</span>
+        <div class="brand-text">
+          <h1>私域销售跟进 Agent</h1>
+          <p>sales-followup-agent · 四段式提示词模板驱动的销售助手</p>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="status" id="status" title="后端就绪状态（/health/ready）">
+          <span class="dot dot-idle" id="status-dot"></span>
+          <span id="status-text">连接中…</span>
+          <span class="status-meta" id="status-meta"></span>
+        </div>
+        <button class="ghost" id="toggle-debug" aria-pressed="false">调用详情</button>
+      </div>
+    </header>
+
+    <div class="layout" id="layout">
+      <aside class="sidebar">
+        <section class="panel">
+          <h2>提示词模板</h2>
+          <label class="field">
+            <span>模板名</span>
+            <select id="template-name">
+              <option value="">不使用模板</option>
+              <option value="sales_followup" selected>sales_followup（企微私域跟进）</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>版本</span>
+            <input id="template-version" value="v1" placeholder="留空取最新" />
+          </label>
+          <label class="field">
+            <span>profile（客户资料）</span>
+            <textarea id="var-profile" rows="3">客户张总，制造业，200 人规模，已试用 5 天，只看过产品手册</textarea>
+          </label>
+          <label class="field">
+            <span>history（最近互动）</span>
+            <textarea id="var-history" rows="2">上周问过价格未报价；昨天问了实施周期和上线风险</textarea>
+          </label>
+          <p class="hint">
+            模板里的占位符是 <code>{profile}</code> <code>{history}</code>。留空发送会由后端返回
+            <code>VALIDATION_1001</code>——这正是模板的「缺变量不渲染半成品」行为。
+          </p>
+        </section>
+
+        <section class="panel">
+          <h2>调用参数</h2>
+          <div class="grid-2">
+            <label class="field">
+              <span>model</span>
+              <input id="model" placeholder="留空用默认" />
+            </label>
+            <label class="field">
+              <span>temperature</span>
+              <input id="temperature" type="number" min="0" max="2" step="0.1" placeholder="空" />
+            </label>
+          </div>
+          <div class="grid-2">
+            <label class="field">
+              <span>max_tokens</span>
+              <input id="max-tokens" type="number" min="1" placeholder="空" />
+            </label>
+            <label class="field">
+              <span>tenant_id</span>
+              <input id="tenant-id" placeholder="t-acme" />
+            </label>
+          </div>
+          <label class="check">
+            <input type="checkbox" id="stream" checked />
+            <span>流式输出（SSE）</span>
+          </label>
+          <p class="hint">关掉流式就走 <code>/v1/chat</code>，一次拿到整段回答与用量。</p>
+        </section>
+
+        <section class="panel stats">
+          <h2>本次会话</h2>
+          <dl>
+            <div><dt>调用次数</dt><dd id="stat-calls">0</dd></div>
+            <div><dt>Tokens</dt><dd id="stat-tokens">0</dd></div>
+            <div><dt>累计费用</dt><dd id="stat-cost">$0.000000</dd></div>
+            <div><dt>平均总耗时</dt><dd id="stat-latency">—</dd></div>
+          </dl>
+          <button class="ghost wide" id="reset">清空会话</button>
+        </section>
+      </aside>
+
+      <main class="main">
+        <div class="messages" id="messages">
+          <div class="empty" id="empty">
+            <h2>先问一句，看看效果</h2>
+            <p>
+              回答会按模板要求分成「阶段判断 / 建议动作 / 话术」三段，下方给出本次调用的
+              耗时、token 与费用——面试时可以指着这行数字讲。
+            </p>
+            <div class="chips">
+              <button class="chip">张总试用 5 天还没报价，下一步该推什么？</button>
+              <button class="chip">客户问能不能打 8 折，我该怎么回？</button>
+              <button class="chip">帮我判断李姐这条线索现在是哪个阶段</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="composer">
+          <textarea
+            id="input"
+            rows="2"
+            placeholder="描述客户情况…  Enter 发送，Shift + Enter 换行"
+          ></textarea>
+          <button class="primary" id="send">发送</button>
+        </div>
+      </main>
+
+      <aside class="debug" id="debug" hidden>
+        <div class="debug-head">
+          <h2>调用详情</h2>
+          <button class="ghost small" id="copy-json">复制</button>
+        </div>
+        <h3>请求体</h3>
+        <pre id="debug-request">（还没有调用）</pre>
+        <h3>响应</h3>
+        <pre id="debug-response">（还没有调用）</pre>
+        <p class="hint">
+          这里显示的是最后一次实际发出的 JSON。排查 <code>VALIDATION_1001</code>、
+          <code>RISK_*</code> 这类错误时，先看这里的 <code>request_id</code>。
+        </p>
+      </aside>
+    </div>
+
+    <script type="module" src="./assets/app.js"></script>
+  </body>
+</html>

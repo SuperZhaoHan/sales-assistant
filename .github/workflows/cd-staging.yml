@@ -14,7 +14,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE: ghcr.io/${{ github.repository }}
+  API_IMAGE: ghcr.io/${{ github.repository }}
+  WEB_IMAGE: ghcr.io/${{ github.repository }}-web
 
 jobs:
   build-and-deploy:
@@ -28,21 +29,37 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push
+
+      # 前后端分别构建、分别打 tag，分别部署；两个镜像互不依赖。
+      - name: Build and push backend
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: deploy/Dockerfile
+          context: ./backend
+          file: ./backend/Dockerfile
           push: true
           tags: |
-            ${{ env.IMAGE }}:staging
-            ${{ env.IMAGE }}:staging-${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            ${{ env.API_IMAGE }}:staging
+            ${{ env.API_IMAGE }}:staging-${{ github.sha }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.WEB_IMAGE }}:staging
+            ${{ env.WEB_IMAGE }}:staging-${{ github.sha }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
       - name: Deploy to staging
         run: |
           echo "Replace this step with kubectl/helm/SSH deployment."
-          echo "Image: ${{ env.IMAGE }}:staging-${{ github.sha }}"
+          echo "API: ${{ env.API_IMAGE }}:staging-${{ github.sha }}"
+          echo "WEB: ${{ env.WEB_IMAGE }}:staging-${{ github.sha }}"
       - name: Smoke test
         run: |
-          echo "Run: python scripts/smoke_test.py https://staging.example.com"
+          echo "Run: python backend/scripts/smoke_test.py https://staging.example.com"

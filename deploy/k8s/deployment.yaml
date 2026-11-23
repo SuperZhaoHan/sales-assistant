@@ -21,7 +21,7 @@ spec:
         fsGroup: 999
       containers:
         - name: app
-          image: ghcr.io/your-org/sales-followup-agent:latest
+          image: ghcr.io/superzhaohan/sales-followup-agent:latest
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

@@ -17,7 +17,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE: ghcr.io/${{ github.repository }}
+  API_IMAGE: ghcr.io/${{ github.repository }}
+  WEB_IMAGE: ghcr.io/${{ github.repository }}-web
 
 jobs:
   deploy:
@@ -30,20 +31,26 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Promote image
+      - name: Promote images
+        # 前后端分开晋升：任一端回滚都不需要动另一端。
         run: |
           docker buildx imagetools create \
-            -t "${IMAGE}:prod" \
-            "${IMAGE}:${{ inputs.image_tag }}"
+            -t "${API_IMAGE}:prod" \
+            "${API_IMAGE}:${{ inputs.image_tag }}"
+          docker buildx imagetools create \
+            -t "${WEB_IMAGE}:prod" \
+            "${WEB_IMAGE}:${{ inputs.image_tag }}"
       - name: Deploy to production
         run: |
           echo "Replace this step with a canary or rolling deployment."
-          echo "Image: ${IMAGE}:${{ inputs.image_tag }}"
+          echo "API: ${API_IMAGE}:${{ inputs.image_tag }}"
+          echo "WEB: ${WEB_IMAGE}:${{ inputs.image_tag }}"
       - name: Post-deploy smoke test
         run: |
-          echo "Run: python scripts/smoke_test.py https://api.example.com"
+          echo "Run: python backend/scripts/smoke_test.py https://api.example.com"
       - name: Rollback instructions
         if: failure()
         run: |
           echo "Roll back to the previous stable image tag."
           echo "kubectl rollout undo deployment/sales-followup-agent"
+          echo "kubectl rollout undo deployment/sales-followup-agent-web"

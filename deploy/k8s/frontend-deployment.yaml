@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sales-followup-agent-web
+  labels:
+    app: sales-followup-agent-web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: sales-followup-agent-web
+  template:
+    metadata:
+      labels:
+        app: sales-followup-agent-web
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+      containers:
+        - name: web
+          image: ghcr.io/superzhaohan/sales-followup-agent-web:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          env:
+            # 指向后端的 Service 名，不用写 IP/端口之外的任何东西。
+            - name: BACKEND_HOST
+              value: sales-followup-agent
+            - name: BACKEND_PORT
+              value: "8000"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            # envsubst 会把渲染后的配置写到 /etc/nginx/conf.d，只读根文件系统下
+            # 必须给它一个可写目录，否则容器起不来（报 Permission denied）。
+            - name: confd
+              mountPath: /etc/nginx/conf.d
+            - name: cache
+              mountPath: /var/cache/nginx
+            - name: run
+              mountPath: /var/run
+      volumes:
+        - name: confd
+          emptyDir: {}
+        - name: cache
+          emptyDir: {}
+        - name: run
+          emptyDir: {}

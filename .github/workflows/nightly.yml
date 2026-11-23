@@ -11,12 +11,16 @@ permissions:
 jobs:
   e2e-and-audit:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
           cache: pip
+          cache-dependency-path: backend/pyproject.toml
       - name: Install
         run: pip install -e ".[dev]"
       - name: End-to-end and contract tests
@@ -28,6 +32,9 @@ jobs:
   # real-llm-contract:
   #   runs-on: ubuntu-latest
   #   environment: ci-llm
+  #   defaults:
+  #     run:
+  #       working-directory: backend
   #   steps:
   #     - uses: actions/checkout@v4
   #     - uses: actions/setup-python@v5

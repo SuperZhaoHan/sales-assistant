@@ -1,10 +1,19 @@
+# 前后端分开部署：两个镜像、两个容器，前端经 nginx 反代访问后端。
+#
+# 端口说明：后端对外映射 8080，容器内仍是 8000。
+# 宿主机 8000 常被其它服务占用（例如同机的 RAG 项目），改这里即可错开。
+#
+#   docker compose up --build
+#   前端 http://localhost:3000
+#   后端 http://localhost:8080/health/ready
+
 services:
-  app:
+  backend:
     build:
-      context: ..
-      dockerfile: deploy/Dockerfile
+      context: ../backend
+      dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "${BACKEND_HOST_PORT:-8080}:8000"
     environment:
       APP_ENV: local
       APP_CONFIG_DIR: /app/config
@@ -15,11 +24,38 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2)"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2)",
+        ]
       interval: 30s
       timeout: 3s
       retries: 3
       start_period: 10s
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    ports:
+      - "${FRONTEND_HOST_PORT:-3000}:80"
+    environment:
+      # nginx 启动时用 envsubst 渲染 upstream 地址，同一个前端镜像可分别指向
+      # compose 的 backend 服务名或 k8s 的 Service 名。
+      BACKEND_HOST: backend
+      BACKEND_PORT: "8000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
 
   redis:
     image: redis:7-alpine
