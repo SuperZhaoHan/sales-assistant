@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: sales-assistant
+  name: sales-followup-agent
   labels:
-    app: sales-assistant
+    app: sales-followup-agent
 spec:
   type: ClusterIP
   selector:
-    app: sales-assistant
+    app: sales-followup-agent
   ports:
     - name: http
       port: 80

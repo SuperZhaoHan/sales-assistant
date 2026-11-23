@@ -1,4 +1,4 @@
-# sales-assistant
+# 私域销售跟进 Agent（sales-followup-agent）
 
 > 环境要求：Python 3.15（Makefile 使用 `python3.15`；可自行调整）。项目声明的最低版本见 `pyproject.toml`。
 
@@ -171,6 +171,62 @@ export APP__LLM__MODEL=claude-opus-5-5
 export LLM_ANTHROPIC_API_KEY=sk-ant-...
 ```
 
+## 提示词模板（四段式）
+
+提示词不进业务代码，统一放在 `src/app/llm/prompts/`，按 `name + version` 存取。所有模板固定四段，缺一不可：
+
+| 段落 | 决定什么 | 为什么必须有 |
+|---|---|---|
+| 【角色】 | 模型站在谁的立场说话 | 同一个问题，站销售和站客户两种立场答案相反 |
+| 【任务】 | 让它做什么 | 不写清会跑偏成「写一篇分析」而不是「给下一步动作」 |
+| 【约束】 | 它不能做什么 | 编造客户信息、乱承诺折扣、越权执行写操作，都在这段挡住 |
+| 【输出格式】 | 结果长什么样 | 下游要能解析，销售要能直接复制粘贴 |
+
+当前内置一版：`sales_followup/v1`（企微私域销售跟进：判断阶段 → 建议动作 → 可发送话术）。
+
+代码里直接用：
+
+```python
+from app.llm.prompts import get_template
+
+system = get_template("sales_followup").render({
+    "profile": "客户张总，制造业，已试用 5 天",
+    "history": "上周问过价格，未报价",
+})
+```
+
+调用接口时也可以不自己拼提示词，把模板名和变量传进来，由后端渲染：
+
+```bash
+curl -s http://localhost:8000/v1/chat \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "messages": [{"role": "user", "content": "下一步怎么跟？"}],
+    "template_name": "sales_followup",
+    "template_vars": {"profile": "客户张总，制造业，已试用 5 天", "history": "上周问过价格，未报价"}
+  }'
+```
+
+响应里同时带回**耗时与费用**，以及这次用的是哪版模板：
+
+```json
+{
+  "ok": true,
+  "data": {
+    "text": "...",
+    "usage": {"input_tokens": 512, "output_tokens": 96, "total_tokens": 608, "cost_usd": 0.0024},
+    "latency_ms": 812.35,
+    "prompt_template": {"name": "sales_followup", "version": "v1"}
+  }
+}
+```
+
+三条工程约束：
+
+- **版本化**：改提示词等于改产品行为，必须带版本号，可回滚、可对比 A/B；
+- **变量缺失直接报错**（`VALIDATION_1001`），不渲染半成品提示词——半成品比报错更难排查；
+- **模板身份进审计**：`prompt_template` 的 name/version 随 `llm_request` 落到审计日志，事后能还原“这条回答是哪版提示词产出的”。
+
 ## 风控
 
 `RiskEngine` 按顺序执行规则，任一规则拒绝即返回：
@@ -226,7 +282,7 @@ pre-commit run --all-files
 ## Docker
 
 ```bash
-docker build -f deploy/Dockerfile -t sales-assistant:local .
+docker build -f deploy/Dockerfile -t sales-followup-agent:local .
 docker compose -f deploy/docker-compose.yml up --build
 ```
 
@@ -257,8 +313,8 @@ docker compose -f deploy/docker-compose.yml up --build
 ## 命令行
 
 ```bash
-.venv/bin/sales-assistant --help
-.venv/bin/sales-assistant --env test check-config
-.venv/bin/sales-assistant --env staging check-secrets
-.venv/bin/sales-assistant serve --reload
+.venv/bin/sales-followup-agent --help
+.venv/bin/sales-followup-agent --env test check-config
+.venv/bin/sales-followup-agent --env staging check-secrets
+.venv/bin/sales-followup-agent serve --reload
 ```

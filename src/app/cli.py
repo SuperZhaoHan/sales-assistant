@@ -50,7 +50,7 @@ def _check_secrets(args: argparse.Namespace) -> int:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="sales-assistant")
+    parser = argparse.ArgumentParser(prog="sales-followup-agent")
     parser.add_argument(
         "--env",
         choices=["local", "test", "staging", "prod"],

@@ -28,6 +28,11 @@ class ChatRequest(BaseModel):
     max_tokens: int | None = Field(default=None, gt=0, le=128_000)
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    # 四段式提示词模板：给了 template_name 就由后端渲染 system prompt，
+    # 调用方不必自己拼提示词，也就不会出现「各写一个版本、改不动」的问题。
+    template_name: str | None = Field(default=None, max_length=64)
+    template_version: str | None = Field(default=None, max_length=16)
+    template_vars: dict[str, str] = Field(default_factory=dict)
 
 
 class UsageResponse(BaseModel):
@@ -43,6 +48,9 @@ class ChatResponse(BaseModel):
     provider: str
     usage: UsageResponse
     stop_reason: str | None = None
+    # 端到端耗时（毫秒），与 usage.cost_usd 一起构成「每次调用的耗时与费用」记录。
+    latency_ms: float
+    prompt_template: dict[str, str] | None = None
 
 
 class ChatEnvelope(BaseModel):

@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: sales-assistant
+  name: sales-followup-agent
   labels:
-    app: sales-assistant
+    app: sales-followup-agent
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: sales-assistant
+      app: sales-followup-agent
   template:
     metadata:
       labels:
-        app: sales-assistant
+        app: sales-followup-agent
     spec:
       securityContext:
         runAsNonRoot: true
@@ -21,7 +21,7 @@ spec:
         fsGroup: 999
       containers:
         - name: app
-          image: ghcr.io/your-org/sales-assistant:latest
+          image: ghcr.io/your-org/sales-followup-agent:latest
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -69,10 +69,10 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: sales-assistant-config
+            name: sales-followup-agent-config
         - name: secrets
           secret:
-            secretName: sales-assistant-secrets
+            secretName: sales-followup-agent-secrets
             items:
               - key: anthropic_api_key
                 path: llm/anthropic_api_key

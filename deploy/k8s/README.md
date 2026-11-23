@@ -3,7 +3,7 @@
 1. Create the config map from the versioned config files:
 
 ```bash
-kubectl create configmap sales-assistant-config \
+kubectl create configmap sales-followup-agent-config \
   --from-file=base.yaml=config/base.yaml \
   --from-file=prod.yaml=config/prod.yaml
 ```
@@ -12,7 +12,7 @@ kubectl create configmap sales-assistant-config \
    `secret://llm/anthropic_api_key` in `config/prod.yaml`:
 
 ```bash
-kubectl create secret generic sales-assistant-secrets \
+kubectl create secret generic sales-followup-agent-secrets \
   --from-file=anthropic_api_key=./secrets/anthropic_api_key
 ```
 

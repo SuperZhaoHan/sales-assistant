@@ -1,4 +1,4 @@
-title = "sales-assistant gitleaks config"
+title = "sales-followup-agent gitleaks config"
 
 [allowlist]
 description = "Allow placeholders and fake credentials used only in tests."

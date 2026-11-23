@@ -1,5 +1,5 @@
 app:
-  name: sales-assistant
+  name: sales-followup-agent
   version: 0.1.0
 
 server:

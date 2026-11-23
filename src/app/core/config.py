@@ -30,7 +30,7 @@ class RuntimeSettings(BaseSettings):
 class AppMeta(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: str = "sales-assistant"
+    name: str = "sales-followup-agent"
     version: str = "0.1.0"
 
 

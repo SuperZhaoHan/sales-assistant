@@ -46,4 +46,4 @@ jobs:
         if: failure()
         run: |
           echo "Roll back to the previous stable image tag."
-          echo "kubectl rollout undo deployment/sales-assistant"
+          echo "kubectl rollout undo deployment/sales-followup-agent"
