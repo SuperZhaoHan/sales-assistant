@@ -189,10 +189,12 @@ export LLM_ANTHROPIC_API_KEY=sk-ant-...
 ```python
 from app.llm.prompts import get_template
 
-system = get_template("sales_followup").render({
-    "profile": "客户张总，制造业，已试用 5 天",
-    "history": "上周问过价格，未报价",
-})
+system = get_template("sales_followup").render(
+    {
+        "profile": "客户张总，制造业，已试用 5 天",
+        "history": "上周问过价格，未报价",
+    }
+)
 ```
 
 调用接口时也可以不自己拼提示词，把模板名和变量传进来，由后端渲染：

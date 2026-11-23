@@ -127,9 +127,7 @@ async def chat_stream(
                                     "total_tokens": chunk.usage.total_tokens,
                                     "cost_usd": chunk.usage.cost_usd,
                                 },
-                                "latency_ms": round(
-                                    (time.perf_counter() - started) * 1000, 2
-                                ),
+                                "latency_ms": round((time.perf_counter() - started) * 1000, 2),
                                 "prompt_template": template_fingerprint,
                             },
                             ensure_ascii=False,

@@ -21,6 +21,7 @@
         {"profile": "客户张总，制造业，已试用 5 天", "history": "上周问过价格，未报价"}
     )
 """
+
 from __future__ import annotations
 
 import re

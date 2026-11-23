@@ -1,4 +1,5 @@
 """四段式提示词模板的单元测试。"""
+
 from __future__ import annotations
 
 import pytest

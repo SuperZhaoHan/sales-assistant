@@ -9,6 +9,7 @@ Exports:
     list_templates  列出已注册模板
     register        注册新模板（同名同版本不可覆盖）
 """
+
 from app.llm.prompts.templates import (
     PromptTemplate,
     get_template,

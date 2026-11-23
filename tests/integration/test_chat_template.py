@@ -1,4 +1,5 @@
 """模板化对话的集成测试：模板渲染、耗时与费用字段、错误路径。"""
+
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
