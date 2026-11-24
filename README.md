@@ -103,3 +103,7 @@ docker compose up --build
 - 工具层与多步循环尚未接入：客户状态取不到实时数据，写操作不会落库，回答只基于调用方传入的资料；
 - `frontend` 没有登录，`subject_id` 由前端固定传 `web-console`；接真实鉴权时必须由后端从令牌取，不能信前端传值；
 - k8s 清单可套用（含前端 `readOnlyRootFilesystem` 所需的三处 emptyDir），但未在真实集群验证过。
+
+## License
+
+MIT，见 [LICENSE](LICENSE)。
