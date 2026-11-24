@@ -10,12 +10,12 @@ frontend/
 ├── assets/
 │   ├── app.js        # 全部逻辑（ES Module，无依赖）
 │   └── styles.css
-├── nginx.conf        # 静态托管 + /v1、/health 反代（SSE 已关缓冲）
+├── templates/        # nginx 模板：静态托管 + /v1、/health 反代（SSE 关缓冲，upstream 由环境变量注入）
 ├── Dockerfile        # nginx:1.27-alpine，三层 COPY
 └── README.md
 ```
 
-## 这个页面在演示什么
+## 这个页面做什么
 
 不是「做个聊天框」，而是把后端的几个能力变成看得见的东西：
 
@@ -51,7 +51,7 @@ docker compose up --build
 
 ## 为什么不引入 React
 
-三个理由，面试可以直接说：
+三个理由：
 
 1. 这个项目的重点是 Agent 引擎（工具层、确认、幂等、轨迹），不是前端框架；
 2. 不引入构建链，镜像里就没有 node 和 node_modules，部署只需一个 nginx；
