@@ -17,7 +17,7 @@ import json
 
 import pytest
 
-from app.agent.loop import run_agent
+from app.agent.loop import MISSING_BY_REASON, run_agent
 from app.agent.planner import ConstantPlanner, ScriptedPlanner
 from app.agent.state import StopReason
 from app.agent.stop import Limits
@@ -134,3 +134,10 @@ async def test_partial_result_is_json_serializable_with_missing() -> None:
     assert payload["partial"]["step_count"] == 1
     assert payload["partial"]["steps"][0]["action"] == "customer_profile"
     assert payload["missing"] == ["步数用尽，还没产出最终答复"]
+
+
+def test_missing_text_covers_every_stop_reason() -> None:
+    """新增停机原因却忘了配文案，会在运行时 KeyError；这里提前拦住。"""
+
+    assert set(MISSING_BY_REASON) == set(StopReason)
+    assert all(isinstance(MISSING_BY_REASON[reason], str) for reason in StopReason)
