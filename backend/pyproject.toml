@@ -5,11 +5,11 @@ build-backend = "hatchling.build"
 [project]
 name = "sales-followup-agent"
 version = "0.1.0"
-description = "Production-oriented Python service base with config, logging, errors, testing, risk control, LLM gateway and secret isolation."
+description = "企微私域销售跟进 Agent：四段式提示词模板、风险控制与 LLM 网关、可观测指标，前后端分离部署。"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
-authors = [{ name = "sales-followup-agent" }]
+authors = [{ name = "赵寒" }]
 dependencies = [
   "fastapi>=0.115.0",
   "uvicorn>=0.34.0",
