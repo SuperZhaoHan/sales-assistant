@@ -27,7 +27,14 @@ class LLMRequest:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def input_text(self) -> str:
-        return "\n".join(message.content for message in self.messages)
+        """算 token 与风控用的全文：``system`` 在前，随后按顺序拼各条消息。
+
+        ``system`` 必须计入：四段式模板渲染后通常是几百个字符，漏掉它会让
+        模板的 token 完全不计费，成本数字比实际小一个量级。
+        """
+        parts = [self.system] if self.system else []
+        parts.extend(message.content for message in self.messages)
+        return "\n".join(parts)
 
 
 @dataclass(frozen=True)
