@@ -32,6 +32,8 @@ class AppMeta(BaseModel):
 
     name: str = "sales-followup-agent"
     version: str = "0.1.0"
+    # 行业包：换行业只换这个值 + 换一个目录，不动代码
+    domain: str = "insurance"
 
 
 class ServerConfig(BaseModel):

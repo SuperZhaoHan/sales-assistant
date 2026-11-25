@@ -1,6 +1,7 @@
 app:
   name: sales-followup-agent
   version: 0.1.0
+  domain: insurance
 
 server:
   host: 0.0.0.0

@@ -13,6 +13,7 @@ from app.core.config import AppConfig, load_config
 from app.core.exception_handlers import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
+from app.domains import load_domain
 from app.llm.factory import build_llm_gateway
 from app.observability.health import router as health_router
 from app.observability.metrics import router as metrics_router
@@ -29,11 +30,14 @@ def create_app(settings: AppConfig | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+        # 第一个动作就是加载行业包：配置写错就死在这里，别等到第一个请求才炸
+        domain = load_domain(settings.app.domain)
         secrets = build_secret_resolver(settings)
         await validate_required_secrets(settings, secrets)
         risk = build_risk_engine(settings)
         llm = await build_llm_gateway(settings, secrets, risk)
 
+        application.state.domain = domain
         application.state.secrets = secrets
         application.state.risk = risk
         application.state.llm = llm
@@ -42,6 +46,9 @@ def create_app(settings: AppConfig | None = None) -> FastAPI:
         logger.info(
             "app_started",
             env=settings.env,
+            domain=domain.name,
+            templates=len(domain.templates),
+            rules=domain.rule_count,
             provider=settings.llm.provider,
             model=settings.llm.model,
             risk_enabled=settings.risk.enabled,
@@ -65,6 +72,7 @@ def create_app(settings: AppConfig | None = None) -> FastAPI:
 
     app.state.settings = settings
     app.state.ready = False
+    app.state.domain = None
     app.state.secrets = None
     app.state.risk = None
     app.state.llm = None
