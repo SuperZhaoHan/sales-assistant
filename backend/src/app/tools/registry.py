@@ -13,11 +13,13 @@ from typing import Any
 from app.core.errors import ValidationError
 from app.tools.base import Tool
 
+# [TUTOR-JAVA] 模块级字典 ≈ 全局 ConcurrentHashMap<String, Tool>，import 期单线程写，无需加锁。
 _TOOLS: dict[str, Tool] = {}
 
 
 def register(tool: Tool) -> Tool:
     """登记一个工具；同名重复登记视为错误（与提示词模板同一套思路）。"""
+    # [TUTOR-WHY] 先查后写：运行期动态热注册时要加锁，现在只在 import 期调用，单线程安全。
     if tool.name in _TOOLS:
         raise ValidationError(
             f"工具已存在：{tool.name}",
@@ -53,9 +55,11 @@ def non_idempotent_writes() -> tuple[str, ...]:
 
 async def execute(name: str, args: Mapping[str, Any]) -> str:
     """按名字执行工具。未知名字与非法参数都在这里被拦住。"""
+    # [TUTOR-JAVA] ≈ DispatcherServlet 的分发：拿字符串查表 → 得到实例 → 调它的 run()。
     return await get_tool(name).run(args)
 
 
 def reset_registry() -> None:
     """测试用：清空注册表，模拟进程重启。"""
+    # [TUTOR-WHY] 测试专用：用例之间互相污染时，光靠 fixture 顺序很难查。
     _TOOLS.clear()
