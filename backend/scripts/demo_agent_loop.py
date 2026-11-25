@@ -16,6 +16,7 @@ from app.agent.loop import Decision, run_agent
 from app.agent.planner import ConstantPlanner, FakeLLMPlanner, ScriptedPlanner
 from app.agent.state import StopReason
 from app.agent.stop import Limits
+from app.domains import load_domain
 from app.llm.fake import FakeLLMProvider
 
 CUSTOMER = "张伟，保单 2026-12-05 到期，状态 in_grace"
@@ -36,6 +37,8 @@ class Tools:
 
 
 async def main() -> int:
+    # 意图词表从行业包来：换行业换 yaml，这里一行不用改
+    intents = load_domain("insurance").intents
     rows: list[tuple[str, str, int, int, float]] = []
 
     # 1）正常跑完：假模型三步
@@ -44,18 +47,24 @@ async def main() -> int:
         "帮我看看张总现在什么阶段，再查下犹豫期退保怎么算",
         planner=FakeLLMPlanner(FakeLLMProvider()),
         tools=tools,
+        intents=intents,
         limits=Limits(max_steps=6, max_tokens=3000),
     )
-    rows.append(("正常完成", result.stop_reason.value, len(result.steps), result.tokens, result.cost_usd))
+    rows.append(
+        ("正常完成", result.stop_reason.value, len(result.steps), result.tokens, result.cost_usd)
+    )
 
     # 2）步数用尽
     result = await run_agent(
         "查客户",
         planner=ConstantPlanner(Decision(action="customer_profile")),
         tools=Tools(),
+        intents=intents,
         limits=Limits(max_steps=2),
     )
-    rows.append(("步数用尽", result.stop_reason.value, len(result.steps), result.tokens, result.cost_usd))
+    rows.append(
+        ("步数用尽", result.stop_reason.value, len(result.steps), result.tokens, result.cost_usd)
+    )
 
     # 3）预算用尽
     result = await run_agent(
@@ -68,6 +77,7 @@ async def main() -> int:
             ]
         ),
         tools=Tools(),
+        intents=intents,
         limits=Limits(max_steps=10, max_tokens=100),
     )
     rows.append(
@@ -80,16 +90,20 @@ async def main() -> int:
         "查客户",
         planner=ConstantPlanner(Decision(action="customer_profile")),
         tools=Tools(),
+        intents=intents,
         limits=Limits(max_steps=10, timeout_seconds=30),
         now=lambda: next(ticks),
     )
-    rows.append(("超时", result.stop_reason.value, len(result.steps), result.tokens, result.cost_usd))
+    rows.append(
+        ("超时", result.stop_reason.value, len(result.steps), result.tokens, result.cost_usd)
+    )
 
     # 5）拒绝：没有工具执行器
     result = await run_agent(
         "帮我建个待办",
         planner=ScriptedPlanner([Decision(action="create_task")]),
         tools=None,
+        intents=intents,
     )
     rows.append(
         ("拒绝执行", result.stop_reason.value, len(result.steps), result.tokens, result.cost_usd)

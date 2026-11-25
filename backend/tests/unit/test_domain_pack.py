@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from app.agent.intent import classify_intent
+from app.agent.state import Intent
 from app.core.errors import ValidationError
 from app.domains import get_domain, load_domain
 
@@ -28,7 +30,13 @@ def test_missing_files_are_reported_all_at_once(tmp_path: Path) -> None:
     with pytest.raises(ValidationError) as exc_info:
         load_domain("motor", root=tmp_path)
 
-    assert exc_info.value.details["missing"] == ["templates.yaml", "rules.yaml", "corpus", "seed"]
+    assert exc_info.value.details["missing"] == [
+        "templates.yaml",
+        "intents.yaml",
+        "rules.yaml",
+        "corpus",
+        "seed",
+    ]
 
 
 def test_yaml_name_must_match_directory(tmp_path: Path) -> None:
@@ -37,6 +45,7 @@ def test_yaml_name_must_match_directory(tmp_path: Path) -> None:
     (pack_dir / "seed").mkdir()
     (pack_dir / "domain.yaml").write_text("name: auto\ndisplay_name: 车险\n", encoding="utf-8")
     (pack_dir / "templates.yaml").write_text("templates: {}\n", encoding="utf-8")
+    (pack_dir / "intents.yaml").write_text("intents:\n  chitchat:\n    - 你好\n", encoding="utf-8")
     (pack_dir / "rules.yaml").write_text("stages: {}\n", encoding="utf-8")
 
     with pytest.raises(ValidationError) as exc_info:
@@ -55,6 +64,7 @@ def test_template_missing_section_fails_at_load(tmp_path: Path) -> None:
         "    task: 判断阶段\n    constraints:\n      - 不编造\n",
         encoding="utf-8",
     )
+    (pack_dir / "intents.yaml").write_text("intents:\n  chitchat:\n    - 你好\n", encoding="utf-8")
     (pack_dir / "rules.yaml").write_text("stages: {}\n", encoding="utf-8")
 
     with pytest.raises(ValidationError) as exc_info:
@@ -78,3 +88,63 @@ def test_insurance_pack_loads_within_budget() -> None:
 
 def test_get_domain_caches_the_same_object() -> None:
     assert get_domain("insurance") is get_domain("insurance")
+
+
+def _write_pack(root: Path, intents_text: str) -> Path:
+    """造一个最小可加载的 pack，只替换 intents.yaml 的内容。"""
+    pack_dir = root / "motor"
+    (pack_dir / "corpus").mkdir(parents=True)
+    (pack_dir / "seed").mkdir()
+    (pack_dir / "domain.yaml").write_text("name: motor\ndisplay_name: 车险\n", encoding="utf-8")
+    (pack_dir / "templates.yaml").write_text("templates: {}\n", encoding="utf-8")
+    (pack_dir / "rules.yaml").write_text("stages: {}\n", encoding="utf-8")
+    (pack_dir / "intents.yaml").write_text(intents_text, encoding="utf-8")
+    return pack_dir
+
+
+def test_pack_ships_intent_table() -> None:
+    pack = load_domain("insurance")
+
+    assert list(pack.intents) == ["create_task", "ask_customer", "ask_knowledge"]
+    assert "建个待办" in pack.intents["create_task"]
+    assert "保单" in pack.intents["ask_customer"]
+    assert "理赔" in pack.intents["ask_knowledge"]
+
+
+def test_unknown_intent_key_fails_at_load(tmp_path: Path) -> None:
+    _write_pack(tmp_path, "intents:\n  make_task:\n    - 建个待办\n")
+
+    with pytest.raises(ValidationError) as exc_info:
+        load_domain("motor", root=tmp_path)
+
+    error = exc_info.value
+    assert error.details["intent"] == "make_task"
+    assert error.details["allowed"] == [
+        "ask_customer",
+        "ask_knowledge",
+        "chitchat",
+        "create_task",
+    ]
+
+
+def test_empty_intent_keywords_fail_at_load(tmp_path: Path) -> None:
+    _write_pack(tmp_path, "intents:\n  ask_customer:\n    - ''\n")
+
+    with pytest.raises(ValidationError) as exc_info:
+        load_domain("motor", root=tmp_path)
+
+    assert exc_info.value.details["intent"] == "ask_customer"
+
+
+def test_same_sentence_is_classified_differently_by_pack() -> None:
+    pack = load_domain("insurance")
+    sentence = "这个学员试听到哪一步了"
+
+    # 保险词表里没有"学员""试听"，整句落进闲聊
+    assert classify_intent(sentence, pack.intents) is Intent.CHITCHAT
+    # 换成课程词表，同一句话命中查客户
+    assert classify_intent(sentence, {"ask_customer": ("学员", "试听")}) is Intent.ASK_CUSTOMER
+
+
+def test_default_table_still_used_when_no_pack_given() -> None:
+    assert classify_intent("帮我看下客户张总现在什么阶段") is Intent.ASK_CUSTOMER

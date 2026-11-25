@@ -13,11 +13,12 @@ from typing import Any
 
 import yaml
 
+from app.agent.state import Intent
 from app.core.errors import ValidationError
 from app.llm.prompts.templates import PromptTemplate
 
 DOMAINS_ROOT = Path(__file__).resolve().parent
-REQUIRED_FILES = ("domain.yaml", "templates.yaml", "rules.yaml")
+REQUIRED_FILES = ("domain.yaml", "templates.yaml", "intents.yaml", "rules.yaml")
 REQUIRED_DIRS = ("corpus", "seed")
 
 _PACKS: dict[str, DomainPack] = {}
@@ -32,6 +33,7 @@ class DomainPack:
     locale: str
     root: Path
     templates: Mapping[str, PromptTemplate]
+    intents: Mapping[str, tuple[str, ...]]
     rules: Mapping[str, Any]
 
     @property
@@ -99,6 +101,41 @@ def _build_template(domain: str, key: str, payload: Any) -> PromptTemplate:
         ) from exc
 
 
+def _build_intents(domain: str, raw: Mapping[str, Any]) -> dict[str, tuple[str, ...]]:
+    """校验意图词表：key 必须是 Intent 的合法值，且每个意图至少一个关键词。
+
+    这两条都是"静默失效"型错误：意图名打错会让整句话落进闲聊，
+    空词表等于这个意图永远不触发——启动时不拦，就只能等线上发现。
+    """
+    allowed = sorted(intent.value for intent in Intent)
+    result: dict[str, tuple[str, ...]] = {}
+    for key, keywords in raw.items():
+        intent_name = str(key)
+        if intent_name not in allowed:
+            raise ValidationError(
+                f"domain {domain} 的 intents.yaml 里有未知意图：{intent_name}",
+                details={"domain": domain, "intent": intent_name, "allowed": allowed},
+            )
+        if not isinstance(keywords, list):
+            raise ValidationError(
+                f"domain {domain} 的意图 {intent_name} 的关键词必须是列表",
+                details={"domain": domain, "intent": intent_name},
+            )
+        cleaned = tuple(str(item).strip() for item in keywords if str(item).strip())
+        if not cleaned:
+            raise ValidationError(
+                f"domain {domain} 的意图 {intent_name} 没有任何有效关键词",
+                details={"domain": domain, "intent": intent_name},
+            )
+        result[intent_name] = cleaned
+    if not result:
+        raise ValidationError(
+            f"domain {domain} 的 intents.yaml 是空的，所有消息都会落进闲聊",
+            details={"domain": domain, "file": "intents.yaml"},
+        )
+    return result
+
+
 def load_domain(name: str, root: Path | None = None) -> DomainPack:
     """加载一个 domain pack；任何缺件、名字不符、YAML 坏了都直接抛。"""
     base = Path(root) if root is not None else DOMAINS_ROOT
@@ -134,6 +171,14 @@ def load_domain(name: str, root: Path | None = None) -> DomainPack:
         )
     templates = {key: _build_template(name, key, payload) for key, payload in raw_templates.items()}
 
+    raw_intents = _read_yaml(pack_dir / "intents.yaml", name).get("intents") or {}
+    if not isinstance(raw_intents, Mapping):
+        raise ValidationError(
+            f"domain {name} 的 intents.yaml 里 intents 必须是映射",
+            details={"domain": name, "file": "intents.yaml"},
+        )
+    intents = _build_intents(name, raw_intents)
+
     rules = _read_yaml(pack_dir / "rules.yaml", name)
 
     return DomainPack(
@@ -142,6 +187,7 @@ def load_domain(name: str, root: Path | None = None) -> DomainPack:
         locale=str(meta.get("locale", "zh-CN")),
         root=pack_dir,
         templates=templates,
+        intents=intents,
         rules=rules,
     )
 

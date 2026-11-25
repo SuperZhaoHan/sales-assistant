@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from app.agent.state import Intent
 from app.core.errors import ValidationError
 
@@ -20,17 +22,25 @@ INTENT_KEYWORDS: dict[Intent, tuple[str, ...]] = {
 }
 
 
-def classify_intent(text: str) -> Intent:
+def classify_intent(
+    text: str,
+    intents: Mapping[str, tuple[str, ...]] | None = None,
+) -> Intent:
     """返回意图；空文本直接报错，不返回 ``chitchat``。
 
     空消息如果归成闲聊，会静默消耗一次模型调用，而且日志里看不出异常。
+
+    ``intents`` 传 domain pack 的词表（``pack.intents``）；
+    不传时用下面这份保险默认词表，只为兼容老调用方与单测。
+    运行时必须传 pack 的——换行业零代码，靠的就是这一层注入。
     """
 
     normalized = text.strip()
     if not normalized:
         raise ValidationError("任务描述不能为空", details={"field": "task"})
 
-    for intent, keywords in INTENT_KEYWORDS.items():
+    table = intents if intents is not None else INTENT_KEYWORDS
+    for name, keywords in table.items():
         if any(keyword in normalized for keyword in keywords):
-            return intent
+            return Intent(name)
     return Intent.CHITCHAT

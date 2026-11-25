@@ -12,7 +12,7 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -61,16 +61,19 @@ async def run_agent(
     planner: Planner,
     limits: Limits | None = None,
     tools: ToolExecutor | None = None,
+    intents: Mapping[str, tuple[str, ...]] | None = None,
     now: Callable[[], float] = time.monotonic,
 ) -> AgentResult:
     """跑一次任务，永远返回 ``AgentResult``，不抛「跑不完」这类异常。
 
     缺工具执行器时不抛异常，而是把 ``refusal`` 置上、下一轮按 ``refused`` 收尾：
     半成品 + 缺什么，比 500 更有用。
+
+    ``intents`` 是 domain pack 的意图词表，由调用方注入——循环本身不知道行业。
     """
 
     limits = limits or Limits()
-    state = AgentState(task=task, intent=classify_intent(task))
+    state = AgentState(task=task, intent=classify_intent(task, intents))
     deadline = now() + limits.timeout_seconds
 
     while True:
