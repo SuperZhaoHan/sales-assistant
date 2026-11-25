@@ -2,6 +2,7 @@ app:
   name: sales-followup-agent
   version: 0.1.0
   domain: insurance
+  store_path: data/app.db
 
 server:
   host: 0.0.0.0

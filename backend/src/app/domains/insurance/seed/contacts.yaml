@@ -1,0 +1,27 @@
+# 种子数据：联系人。字段名与 store/sqlite_store.py 的建表语句一一对应，改字段要两边一起改。
+# 这里的手机号、身份证是明文 —— 它们是「导入源」，入库时会被 mask_pii 脱敏，库里不留明文。
+contacts:
+  - id: c-1001
+    name: 张伟
+    phone: "13812348000"
+    id_card: "110101199001011234"
+    advisor: 王敏
+    last_interaction_at: "2026-11-18"
+  - id: c-1002
+    name: 李娜
+    phone: "13900001111"
+    id_card: "110101198805052345"
+    advisor: 王敏
+    last_interaction_at: "2026-10-30"
+  - id: c-1003
+    name: 陈建国
+    phone: "13700002222"
+    id_card: "310101197503034567"
+    advisor: 李强
+    last_interaction_at: "2025-12-20"
+  - id: c-1004
+    name: 王芳
+    phone: "13600003333"
+    id_card: "110101199512125678"
+    advisor: 李强
+    last_interaction_at: "2026-09-02"

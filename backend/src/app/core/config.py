@@ -34,6 +34,8 @@ class AppMeta(BaseModel):
     version: str = "0.1.0"
     # 行业包：换行业只换这个值 + 换一个目录，不动代码
     domain: str = "insurance"
+    # 客户档案库文件（SQLite）。相对路径按启动目录解析；测试里用 ":memory:"
+    store_path: str = "data/app.db"
 
 
 class ServerConfig(BaseModel):

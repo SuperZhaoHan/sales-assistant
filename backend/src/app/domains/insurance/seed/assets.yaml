@@ -1,0 +1,33 @@
+# 种子数据：持有资产。premium_cents 用「分」存整数，避免浮点误差（12,800.00 元 = 1280000）。
+# status 是枚举值（待续保 / 已失效 / 待核保 / 已续保），工具会原样带出去，不做翻译。
+assets:
+  - id: a-2001
+    contact_id: c-1001
+    product: 平安福终身重疾险
+    status: 待续保
+    expires_at: "2026-03-01"
+    premium_cents: 1280000
+  - id: a-2002
+    contact_id: c-1001
+    product: 百万医疗险
+    status: 已失效
+    expires_at: "2025-12-31"
+    premium_cents: 68000
+  - id: a-2003
+    contact_id: c-1002
+    product: 年金险（十年期）
+    status: 待续保
+    expires_at: "2026-06-15"
+    premium_cents: 2000000
+  - id: a-2004
+    contact_id: c-1002
+    product: 综合意外险
+    status: 已续保
+    expires_at: "2027-01-01"
+    premium_cents: 30000
+  - id: a-2005
+    contact_id: c-1003
+    product: 定期寿险
+    status: 待核保
+    expires_at: "2026-01-20"
+    premium_cents: 360000

@@ -21,3 +21,6 @@ risk:
 observability:
   metrics_enabled: false
   otel_enabled: false
+
+app:
+  store_path: ":memory:"

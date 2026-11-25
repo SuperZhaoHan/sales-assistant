@@ -13,6 +13,8 @@ def test_staging_fails_fast_when_required_secret_missing() -> None:
     settings.secrets.provider = "env"
     settings.secrets.required = ["missing/secret"]
     settings.redis.enabled = False
+    # 启动期会开库；这个用例只关心密钥校验，别在仓库里留下 data/app.db
+    settings.app.store_path = ":memory:"
     settings.llm.provider = "fake"
     settings.llm.allowed_models = ["fake-model"]
     settings.observability.otel_enabled = False

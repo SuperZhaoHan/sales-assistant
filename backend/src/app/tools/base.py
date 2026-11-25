@@ -99,14 +99,12 @@ class Tool:
             return self.args_schema.model_validate(dict(args))
         except PydanticValidationError as exc:
             # [TUTOR-WHY] 转译异常：pydantic 只说字段路径，不说是哪个工具。
+            errors = [{"loc": list(err["loc"]), "msg": err["msg"]} for err in exc.errors()]
+            # 把出错字段名拼进消息体：只看一行日志（而不是 details）时也能定位
+            fields = "、".join(".".join(str(part) for part in err["loc"]) for err in errors)
             raise ValidationError(
-                f"工具 {self.name} 的参数不合法：{exc.error_count()} 处错误",
-                details={
-                    "tool": self.name,
-                    "errors": [
-                        {"loc": list(err["loc"]), "msg": err["msg"]} for err in exc.errors()
-                    ],
-                },
+                f"工具 {self.name} 的参数不合法：{exc.error_count()} 处错误 —— {fields}",
+                details={"tool": self.name, "errors": errors},
             ) from exc
 
     async def run(self, args: Mapping[str, Any]) -> str:

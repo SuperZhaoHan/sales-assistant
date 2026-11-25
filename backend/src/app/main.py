@@ -20,6 +20,7 @@ from app.observability.metrics import router as metrics_router
 from app.observability.tracing import setup_tracing
 from app.risk.engine import build_risk_engine
 from app.security.secrets.factory import build_secret_resolver, validate_required_secrets
+from app.tools.bootstrap import open_store, register_domain_tools
 
 logger = structlog.get_logger(__name__)
 
@@ -34,10 +35,15 @@ def create_app(settings: AppConfig | None = None) -> FastAPI:
         domain = load_domain(settings.app.domain)
         secrets = build_secret_resolver(settings)
         await validate_required_secrets(settings, secrets)
+        # 密钥校验通过之后才碰外部资源：配错了不该先建出一个空库
+        store = open_store(settings.app.store_path, domain.root / "seed")
+        # 工具没登记，模型点名也调不到
+        tools = register_domain_tools(store)
         risk = build_risk_engine(settings)
         llm = await build_llm_gateway(settings, secrets, risk)
 
         application.state.domain = domain
+        application.state.store = store
         application.state.secrets = secrets
         application.state.risk = risk
         application.state.llm = llm
@@ -52,11 +58,14 @@ def create_app(settings: AppConfig | None = None) -> FastAPI:
             provider=settings.llm.provider,
             model=settings.llm.model,
             risk_enabled=settings.risk.enabled,
+            contacts=store.contact_count(),
+            tools=tools,
         )
         try:
             yield
         finally:
             application.state.ready = False
+            store.close()
             await llm.aclose()
             await risk.aclose()
             logger.info("app_stopped", env=settings.env)
