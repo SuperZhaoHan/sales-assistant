@@ -33,8 +33,14 @@ class DomainPack:
     locale: str
     root: Path
     templates: Mapping[str, PromptTemplate]
+    entry_template: str
     intents: Mapping[str, tuple[str, ...]]
     rules: Mapping[str, Any]
+
+    @property
+    def entry(self) -> PromptTemplate:
+        """行业入口模板。代码只认这个属性，不认具体模板名。"""
+        return self.templates[self.entry_template]
 
     @property
     def rule_count(self) -> int:
@@ -171,6 +177,22 @@ def load_domain(name: str, root: Path | None = None) -> DomainPack:
         )
     templates = {key: _build_template(name, key, payload) for key, payload in raw_templates.items()}
 
+    entry_template = str(meta.get("entry_template", "")).strip()
+    if not entry_template:
+        raise ValidationError(
+            f"domain {name} 的 domain.yaml 缺少 entry_template（代码不知道用哪个模板）",
+            details={"domain": name, "file": "domain.yaml"},
+        )
+    if entry_template not in templates:
+        raise ValidationError(
+            f"domain {name} 的 entry_template 指向不存在的模板：{entry_template}",
+            details={
+                "domain": name,
+                "entry_template": entry_template,
+                "available": sorted(templates),
+            },
+        )
+
     raw_intents = _read_yaml(pack_dir / "intents.yaml", name).get("intents") or {}
     if not isinstance(raw_intents, Mapping):
         raise ValidationError(
@@ -187,6 +209,7 @@ def load_domain(name: str, root: Path | None = None) -> DomainPack:
         locale=str(meta.get("locale", "zh-CN")),
         root=pack_dir,
         templates=templates,
+        entry_template=entry_template,
         intents=intents,
         rules=rules,
     )

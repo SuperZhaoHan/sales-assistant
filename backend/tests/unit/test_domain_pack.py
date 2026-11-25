@@ -90,13 +90,25 @@ def test_get_domain_caches_the_same_object() -> None:
     assert get_domain("insurance") is get_domain("insurance")
 
 
-def _write_pack(root: Path, intents_text: str) -> Path:
-    """造一个最小可加载的 pack，只替换 intents.yaml 的内容。"""
+def _write_pack(
+    root: Path,
+    intents_text: str,
+    entry_template: str | None = "motor_summary",
+) -> Path:
+    """造一个最小可加载的 pack；entry_template=None 表示 domain.yaml 里不写这一项。"""
     pack_dir = root / "motor"
     (pack_dir / "corpus").mkdir(parents=True)
     (pack_dir / "seed").mkdir()
-    (pack_dir / "domain.yaml").write_text("name: motor\ndisplay_name: 车险\n", encoding="utf-8")
-    (pack_dir / "templates.yaml").write_text("templates: {}\n", encoding="utf-8")
+    meta = "name: motor\ndisplay_name: 车险\n"
+    if entry_template is not None:
+        meta += f"entry_template: {entry_template}\n"
+    (pack_dir / "domain.yaml").write_text(meta, encoding="utf-8")
+    (pack_dir / "templates.yaml").write_text(
+        "templates:\n  motor_summary:\n    version: v1\n    role: 你是助理\n"
+        "    task: 判断阶段\n    constraints:\n      - 不编造\n"
+        "    output_format: 三行\n",
+        encoding="utf-8",
+    )
     (pack_dir / "rules.yaml").write_text("stages: {}\n", encoding="utf-8")
     (pack_dir / "intents.yaml").write_text(intents_text, encoding="utf-8")
     return pack_dir
@@ -148,3 +160,31 @@ def test_same_sentence_is_classified_differently_by_pack() -> None:
 
 def test_default_table_still_used_when_no_pack_given() -> None:
     assert classify_intent("帮我看下客户张总现在什么阶段") is Intent.ASK_CUSTOMER
+
+
+def test_pack_declares_entry_template() -> None:
+    pack = load_domain("insurance")
+
+    assert pack.entry_template == "insurance_summary"
+    assert pack.entry.name == "insurance_summary"
+    assert pack.entry.variables == ("profile", "assets", "history")
+
+
+def test_entry_template_is_required(tmp_path: Path) -> None:
+    _write_pack(tmp_path, "intents:\n  chitchat:\n    - 你好\n", entry_template=None)
+
+    with pytest.raises(ValidationError) as exc_info:
+        load_domain("motor", root=tmp_path)
+
+    assert exc_info.value.details["file"] == "domain.yaml"
+
+
+def test_entry_template_must_point_to_existing_template(tmp_path: Path) -> None:
+    _write_pack(tmp_path, "intents:\n  chitchat:\n    - 你好\n", entry_template="course_summary")
+
+    with pytest.raises(ValidationError) as exc_info:
+        load_domain("motor", root=tmp_path)
+
+    error = exc_info.value
+    assert error.details["entry_template"] == "course_summary"
+    assert error.details["available"] == ["motor_summary"]
