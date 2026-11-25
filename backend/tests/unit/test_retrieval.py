@@ -81,9 +81,7 @@ def test_cross_tenant_invisible(retriever: Retriever) -> None:
 def test_duplicate_id_rejected(tmp_path: Path) -> None:
     file = tmp_path / "dup.yaml"
     file.write_text(
-        "chunks:\n"
-        "  - {id: kb-1, title: A, text: 甲}\n"
-        "  - {id: kb-1, title: B, text: 乙}\n",
+        "chunks:\n  - {id: kb-1, title: A, text: 甲}\n  - {id: kb-1, title: B, text: 乙}\n",
         encoding="utf-8",
     )
     with pytest.raises(ValidationError) as caught:

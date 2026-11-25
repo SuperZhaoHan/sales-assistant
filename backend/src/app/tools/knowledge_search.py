@@ -22,9 +22,7 @@ class KnowledgeSearchArgs(BaseModel):
     top_k: int = Field(default=3, ge=1, le=5, description="召回条数，默认 3")
     # [TUTOR-WHY] 租户从参数进来、不由模型随手填：阶段 2 会改成从登录态注入，
     # [TUTOR-WHY] 模型只能决定「查什么」，不能决定「查谁的数据」
-    tenant_id: str = Field(
-        default="default", min_length=1, description="租户；跨租户内容不可见"
-    )
+    tenant_id: str = Field(default="default", min_length=1, description="租户；跨租户内容不可见")
 
 
 def build_knowledge_search_tool(

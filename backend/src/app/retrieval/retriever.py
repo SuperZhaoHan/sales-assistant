@@ -77,7 +77,5 @@ class Retriever:
         if not query:
             # [TUTOR-WHY] 空问题不返回「最像的几条」：那等于随机推荐，模型会当成证据用
             raise ValidationError("检索问题不能为空", details={"field": "query"})
-        hits = self._store.search(
-            self._embedder.embed(query), top_k=top_k, tenant_id=tenant_id
-        )
+        hits = self._store.search(self._embedder.embed(query), top_k=top_k, tenant_id=tenant_id)
         return tuple(hit for hit in hits if hit.score >= min_score)
