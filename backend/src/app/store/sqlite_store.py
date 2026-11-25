@@ -41,6 +41,12 @@ CREATE INDEX IF NOT EXISTS idx_contacts_name ON contacts(name);
 CREATE INDEX IF NOT EXISTS idx_assets_contact ON assets(contact_id);
 """
 
+# 白名单：表名不参与 SQL 拼接，静态扫描（bandit B608）也不会报
+_RAW_QUERIES = {
+    "contacts": "SELECT * FROM contacts",
+    "assets": "SELECT * FROM assets",
+}
+
 
 @dataclass(frozen=True, slots=True)
 class Contact:
@@ -164,7 +170,13 @@ class CustomerStore:
     def raw_rows(self, table: str) -> Iterable[sqlite3.Row]:
         """原样返回表里的行——只给测试用。"""
         # [TUTOR-WHY] 生产路径不许读它：绕过脱敏只需要一次「顺手查一下原始表」。
-        return self.conn.execute(f"SELECT * FROM {table}").fetchall()
+        # [TUTOR-WHY] 表名走白名单字典，不做字符串插值：拼接 SQL 是注入的入门姿势，静态扫描会拦。
+        query = _RAW_QUERIES.get(table)
+        if query is None:
+            raise ValidationError(
+                f"未知的表：{table}", details={"table": table, "available": sorted(_RAW_QUERIES)}
+            )
+        return self.conn.execute(query).fetchall()
 
 
 def _to_contact(row: sqlite3.Row) -> Contact:
