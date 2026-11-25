@@ -12,7 +12,8 @@ import time
 from pathlib import Path
 
 from app.core.errors import ValidationError
-from app.tools.bootstrap import open_store, register_domain_tools
+from app.domains import load_domain
+from app.tools.bootstrap import bootstrap_domain
 from app.tools.registry import execute, reset_registry
 
 SEED = Path(__file__).resolve().parents[1] / "src/app/domains/insurance/seed"
@@ -23,13 +24,13 @@ async def main() -> None:
         path = Path(tmp) / "demo.db"
 
         started = time.perf_counter()
-        store = open_store(path, SEED)
-        build_ms = (time.perf_counter() - started) * 1000
         reset_registry()
-        names = register_domain_tools(store)
+        boot = bootstrap_domain(load_domain("insurance"), path)
+        build_ms = (time.perf_counter() - started) * 1000
+        store, names = boot.store, boot.tools
 
         print(f"建库 + 灌种子：{build_ms:.1f} ms，联系人 {store.contact_count()} 行")
-        print(f"注册表：{names}")
+        print(f"注册表：{names}，语料 {boot.retriever.size} 条")
         print(f"库文件：{path.stat().st_size / 1024:.0f} KB\n")
 
         print("— 有资产 —")

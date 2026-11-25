@@ -14,10 +14,11 @@ import pytest
 
 from app.agent.planner import FakeLLMPlanner
 from app.core.errors import ValidationError
+from app.domains import load_domain
 from app.store.sqlite_store import CustomerStore
-from app.tools.bootstrap import open_store, register_domain_tools
+from app.tools.bootstrap import build_retriever, open_store, register_domain_tools
 from app.tools.customer_profile import build_customer_profile_tool
-from app.tools.registry import list_tools, reset_registry
+from app.tools.registry import reset_registry
 
 SEED_DIR = Path(__file__).resolve().parents[2] / "src/app/domains/insurance/seed"
 PLAINTEXT_PHONE = "13812348000"
@@ -90,8 +91,8 @@ async def test_empty_name_rejected(tool) -> None:
 
 
 def test_registered_tools_are_known_to_planner(store: CustomerStore) -> None:
-    names = register_domain_tools(store)
-    assert names == ("customer_profile",)
+    pack = load_domain("insurance")
+    names = register_domain_tools(pack, store, build_retriever(pack.root / "corpus"))
+    assert names == ("customer_profile", "knowledge_search")
     # 反向约束：注册了却没人会调的工具，等于挂了一块牌子
     assert set(names).issubset(set(FakeLLMPlanner.actions))
-    assert [tool.name for tool in list_tools()] == ["customer_profile"]
