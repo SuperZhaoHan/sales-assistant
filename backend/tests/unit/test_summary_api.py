@@ -56,6 +56,9 @@ def test_summary_endpoint_is_wired_to_entry_template(client) -> None:
     assert data["usage"]["total_tokens"] > 0
     # 事实清单必须带出来：1.6 的引用反查要用它
     assert "2026-11-18" in data["facts"]
+    # fake provider 不产引用 → 可追溯率必须是 None，而不是假装 100%
+    assert data["citations"] == []
+    assert data["traceable_rate"] is None
 
 
 def test_summary_endpoint_unknown_customer_costs_zero(client) -> None:
@@ -67,6 +70,8 @@ def test_summary_endpoint_unknown_customer_costs_zero(client) -> None:
     assert data["usage"]["total_tokens"] == 0
     assert data["usage"]["cost_usd"] == 0.0
     assert data["prompt_template"] is None
+    assert data["citations"] == []
+    assert data["traceable_rate"] is None
     assert "未找到客户：张三" in data["text"]
 
 

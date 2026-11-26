@@ -167,7 +167,8 @@ def test_pack_declares_entry_template() -> None:
 
     assert pack.entry_template == "insurance_summary"
     assert pack.entry.name == "insurance_summary"
-    assert pack.entry.variables == ("profile", "assets", "history")
+    # facts 是 1.6 加的编号化事实清单：模型只能引用这里发过的编号
+    assert pack.entry.variables == ("profile", "assets", "history", "facts")
 
 
 def test_entry_template_is_required(tmp_path: Path) -> None:

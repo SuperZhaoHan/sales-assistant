@@ -41,7 +41,9 @@ def main() -> None:
             print()
 
         print("— 张伟这次实际发给模型的 system prompt 头 12 行 —")
-        request = app.state.domain.entry.render({"profile": "…", "assets": "…", "history": "…"})
+        request = app.state.domain.entry.render(
+            {"profile": "…", "assets": "…", "history": "…", "facts": "F1=…"}
+        )
         for line in request.splitlines()[:12]:
             print(line)
         print("\n（上面是占位符版，真实调用里三段被填成张伟的资料与资产）")

@@ -36,8 +36,23 @@ class Brief:
     facts: tuple[str, ...]
 
     def variables(self) -> dict[str, str]:
-        """模板要的三个占位符：正好对上 templates.yaml 里的 {profile}/{assets}/{history}。"""
-        return {"profile": self.profile, "assets": self.assets, "history": self.history}
+        """模板要的占位符：三个数据段 + 编号化的事实清单。
+
+        事实清单必须带上编号（F1、F2…），模型才有东西可引用；
+        编号在 ``build_catalog`` 里按同样顺序生成，两边对得上。
+        """
+        return {
+            "profile": self.profile,
+            "assets": self.assets,
+            "history": self.history,
+            "facts": self.fact_list(),
+        }
+
+    def fact_list(self) -> str:
+        """``F1=2026-03-01`` 这样一行一条。没有事实时写「无」，不留空。"""
+        if not self.facts:
+            return "无"
+        return "\n".join(f"F{index}={value}" for index, value in enumerate(self.facts, start=1))
 
 
 def build_brief(

@@ -33,7 +33,9 @@ def test_brief_splits_into_three_variables(store: CustomerStore) -> None:
     assert "到期：2026-03-01" in brief.assets
     assert "状态：待续保" in brief.assets
     assert brief.history == "最近互动：2026-11-18"
-    assert set(brief.variables()) == {"profile", "assets", "history"}
+    assert set(brief.variables()) == {"profile", "assets", "history", "facts"}
+    # 事实清单要带编号，模型才有东西可引用
+    assert brief.variables()["facts"].startswith("F1=")
 
 
 def test_facts_cover_expiry_status_and_interaction(store: CustomerStore) -> None:
@@ -56,7 +58,7 @@ def test_customer_without_assets_has_only_one_fact(store: CustomerStore) -> None
 def test_unknown_customer_returns_empty_brief(store: CustomerStore) -> None:
     brief = build_brief(store, "张三")
     assert brief.found is False
-    assert brief.variables() == {"profile": "", "assets": "", "history": ""}
+    assert brief.variables() == {"profile": "", "assets": "", "history": "", "facts": "无"}
     assert brief.facts == ()
     assert "未找到客户：张三" in not_found_text("张三")
 

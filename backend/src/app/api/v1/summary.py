@@ -6,9 +6,11 @@ import structlog
 from fastapi import APIRouter, Depends, Request
 
 from app.agent.brief import build_brief, not_found_text
+from app.agent.citation import build_catalog, resolve_citations
 from app.agent.summary import build_summary_request
 from app.api.deps import get_domain, get_llm_gateway, get_settings, get_store
 from app.api.v1.schemas import (
+    CitationResponse,
     SummaryEnvelope,
     SummaryRequest,
     SummaryResponse,
@@ -58,6 +60,8 @@ async def create_summary(
                 found=False,
                 customer_name=payload.customer_name,
                 facts=[],
+                citations=[],
+                traceable_rate=None,
                 usage=UsageResponse(input_tokens=0, output_tokens=0, total_tokens=0, cost_usd=0.0),
                 stop_reason=None,
                 latency_ms=round((time.perf_counter() - started) * 1000, 2),
@@ -72,6 +76,11 @@ async def create_summary(
         ip=request.client.host if request.client else None,
     )
     response = await gateway.complete(llm_request, subject)
+
+    # [TUTOR-WHY] 反查放在模型返回之后、响应组装之前：引用判定只依赖 facts，不依赖模型自述
+    catalog = build_catalog(brief.facts)
+    citations, traceable_rate = resolve_citations(response.text, catalog)
+
     latency_ms = round((time.perf_counter() - started) * 1000, 2)
     logger.info(
         "summary_generated",
@@ -79,6 +88,8 @@ async def create_summary(
         total_tokens=response.usage.total_tokens,
         cost_usd=response.usage.cost_usd,
         latency_ms=latency_ms,
+        citations=len(citations),
+        traceable_rate=traceable_rate,
     )
     return SummaryEnvelope(
         data=SummaryResponse(
@@ -88,6 +99,17 @@ async def create_summary(
             found=True,
             customer_name=brief.customer_name,
             facts=list(brief.facts),
+            citations=[
+                CitationResponse(
+                    label=citation.label,
+                    kind=citation.kind,
+                    ref_id=citation.ref_id,
+                    source=citation.source,
+                    resolved=citation.resolved,
+                )
+                for citation in citations
+            ],
+            traceable_rate=traceable_rate,
             usage=UsageResponse(
                 input_tokens=response.usage.input_tokens,
                 output_tokens=response.usage.output_tokens,

@@ -75,6 +75,19 @@ class SummaryRequest(BaseModel):
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
 
 
+class CitationResponse(BaseModel):
+    """一条引用：编号 + 反查到的原文。
+
+    ``resolved=False`` 表示这个编号后端从没发过 —— 模型编的，或者写错了。
+    """
+
+    label: str
+    kind: Literal["fact", "knowledge", "unknown"]
+    ref_id: str
+    source: str
+    resolved: bool
+
+
 class SummaryResponse(BaseModel):
     text: str
     model: str
@@ -84,6 +97,10 @@ class SummaryResponse(BaseModel):
     customer_name: str
     # 本次可用来校验摘要的事实清单（到期日/状态/最近互动），供上游做引用反查
     facts: list[str]
+    # 摘要里出现的引用及其反查结果
+    citations: list[CitationResponse]
+    # 可追溯率 = 能查回原文的引用 / 总引用；一条引用都没有时为 null，不算 100%
+    traceable_rate: float | None = None
     usage: UsageResponse
     stop_reason: str | None = None
     latency_ms: float
