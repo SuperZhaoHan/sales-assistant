@@ -84,3 +84,50 @@ async def test_openai_compat_stream_contract() -> None:
     assert "".join(chunk.delta for chunk in chunks) == "hello"
     assert chunks[-1].done is True
     assert chunks[-1].usage is not None
+
+
+async def test_openai_compat_disables_thinking_when_configured() -> None:
+    """配了 disabled 就必须把思考模式关掉：DeepSeek 默认开启会白烧 max_tokens。"""
+    response_payload = {
+        "model": "test-model",
+        "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
+        "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+    }
+
+    with respx.mock(base_url=BASE_URL) as respx_mock:
+        route = respx_mock.post("/chat/completions").mock(
+            return_value=httpx.Response(200, json=response_payload)
+        )
+        provider = OpenAICompatProvider(
+            api_key=SecretValue("sk-test"),
+            base_url=BASE_URL,
+            thinking="disabled",
+        )
+        await provider.complete(make_request())
+        await provider.aclose()
+
+    payload = json.loads(route.calls[0].request.content)
+    assert payload["thinking"] == {"type": "disabled"}
+
+
+async def test_openai_compat_omits_thinking_by_default() -> None:
+    """没配就不该凭空加这个字段，否则对非 DeepSeek 的兼容端点是未知参数。"""
+    response_payload = {
+        "model": "test-model",
+        "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
+        "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+    }
+
+    with respx.mock(base_url=BASE_URL) as respx_mock:
+        route = respx_mock.post("/chat/completions").mock(
+            return_value=httpx.Response(200, json=response_payload)
+        )
+        provider = OpenAICompatProvider(
+            api_key=SecretValue("sk-test"),
+            base_url=BASE_URL,
+        )
+        await provider.complete(make_request())
+        await provider.aclose()
+
+    payload = json.loads(route.calls[0].request.content)
+    assert "thinking" not in payload

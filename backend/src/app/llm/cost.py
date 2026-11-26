@@ -15,6 +15,11 @@ MODEL_PRICES: dict[str, tuple[float, float]] = {
     "claude-sonnet-4-6": (3.0, 15.0),
     "claude-haiku-5-5": (0.10, 0.50),
     "claude-haiku-4-5": (1.0, 5.0),
+    # DeepSeek 有高峰/空闲两档价，取高峰价（贵的那档）估成本，避免低估
+    "deepseek-flash": (0.30, 1.20),
+    "deepseek-v4-pro": (1.32, 3.96),
+    "deepseek-chat": (0.28, 0.42),
+    "deepseek-reasoner": (0.28, 0.42),
 }
 
 

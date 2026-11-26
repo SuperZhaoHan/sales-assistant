@@ -47,6 +47,7 @@ async def build_llm_provider(settings: AppConfig, secrets: SecretResolver) -> LL
             api_key=api_key,
             base_url=config.base_url,
             timeout_seconds=config.timeout_seconds,
+            thinking=config.thinking,
         )
 
     raise ConfigurationError(f"unsupported llm provider: {config.provider}")

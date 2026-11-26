@@ -53,12 +53,16 @@ class OpenAICompatProvider(LLMProvider):
         api_key: SecretValue,
         base_url: str,
         timeout_seconds: float = 60.0,
+        thinking: str | None = None,
     ) -> None:
         if not base_url:
             raise ConfigurationError("llm.base_url is required for the openai_compat provider")
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout_seconds
+        # DeepSeek 等服务默认开思考模式，且思考 token 也算在 max_tokens 里；
+        # 摘要这种"格式严格、要省 token"的任务必须显式关掉。
+        self._thinking = thinking
         self._client = httpx.AsyncClient(timeout=timeout_seconds)
 
     def _headers(self) -> dict[str, str]:
@@ -81,6 +85,8 @@ class OpenAICompatProvider(LLMProvider):
         }
         if request.temperature is not None:
             payload["temperature"] = request.temperature
+        if self._thinking == "disabled":
+            payload["thinking"] = {"type": "disabled"}
         if stream:
             payload["stream"] = True
         return payload
