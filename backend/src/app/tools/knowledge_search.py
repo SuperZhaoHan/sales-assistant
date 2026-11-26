@@ -25,8 +25,18 @@ class KnowledgeSearchArgs(BaseModel):
     tenant_id: str = Field(default="default", min_length=1, description="租户；跨租户内容不可见")
 
 
+DEFAULT_REFUSAL_TEXT = (
+    "知识库中未找到与「{query}」相关的内容（相关性阈值 {min_score}）。"
+    "请如实告知需要人工确认，不要凭常识作答。"
+)
+
+
 def build_knowledge_search_tool(
-    retriever: Retriever, *, min_score: float = 0.35, tenant_id: str = "default"
+    retriever: Retriever,
+    *,
+    min_score: float = 0.35,
+    refusal_text: str = DEFAULT_REFUSAL_TEXT,
+    tenant_id: str = "default",
 ) -> Tool:
     async def handler(args: KnowledgeSearchArgs) -> str:
         # [TUTOR-WHY] 检索是纯内存点积（微秒级），不值得开线程；
@@ -34,7 +44,7 @@ def build_knowledge_search_tool(
         hits = retriever.search(
             args.query, top_k=args.top_k, tenant_id=args.tenant_id or tenant_id, min_score=min_score
         )
-        return render(args.query, hits, min_score=min_score)
+        return render(args.query, hits, min_score=min_score, refusal_text=refusal_text)
 
     return Tool(
         name="knowledge_search",
@@ -48,13 +58,17 @@ def build_knowledge_search_tool(
     )
 
 
-def render(query: str, hits: tuple[Hit, ...], *, min_score: float) -> str:
+def render(
+    query: str,
+    hits: tuple[Hit, ...],
+    *,
+    min_score: float,
+    refusal_text: str = DEFAULT_REFUSAL_TEXT,
+) -> str:
     if not hits:
-        # [TUTOR-WHY] 这句话是给模型看的指令，不是给客户看的：宁可说没有，也不能让它自己编
-        return (
-            f"知识库中未找到与「{query}」相关的内容（相关性阈值 {min_score}）。"
-            "请如实告知需要人工确认，不要凭常识作答。"
-        )
+        # [TUTOR-WHY] 这句话是给模型看的指令：宁可说没有，也不能让它自己编
+        # [TUTOR-WHY] 文案来自行业包，代码只负责把 query / 阈值填进去
+        return refusal_text.format(query=query, min_score=min_score).strip()
     # [TUTOR-JAVA] 这里 ≈ 把 List<Hit> 拼成一段文本；模型只能读字符串，读不到对象
     lines = [f"检索「{query}」命中 {len(hits)} 条："]
     for index, hit in enumerate(hits, 1):

@@ -59,13 +59,30 @@ def min_score_from(pack: DomainPack) -> float:
     return float(thresholds.get("retrieval_min_score", DEFAULT_MIN_SCORE))
 
 
+def refusal_text_from(pack: DomainPack) -> str | None:
+    """拒答话术也来自 pack；没配就返回 None，由工具用默认文案。"""
+    refusal = pack.rules.get("refusal") or {}
+    text = refusal.get("text") if isinstance(refusal, dict) else None
+    return str(text).strip() if text else None
+
+
+def _optional_refusal(pack: DomainPack) -> dict[str, str]:
+    # [TUTOR-WHY] 没配就不传，交给工具用默认文案：不把 None 传进去让下游判断
+    text = refusal_text_from(pack)
+    return {"refusal_text": text} if text else {}
+
+
 def build_toolset(
-    store: CustomerStore, retriever: Retriever, *, min_score: float
+    pack: DomainPack, store: CustomerStore, retriever: Retriever, *, min_score: float
 ) -> tuple[Tool, ...]:
     """工具清单。顺序 = 给模型看的顺序，也是注册表里的插入序。"""
     return (
         build_customer_profile_tool(store),
-        build_knowledge_search_tool(retriever, min_score=min_score),
+        build_knowledge_search_tool(
+            retriever,
+            min_score=min_score,
+            **_optional_refusal(pack),
+        ),
     )
 
 
@@ -77,7 +94,7 @@ def register_domain_tools(
     已经登记过就跳过：测试里会反复创建 app，启动期重复登记不该被当成错误。
     """
     existing = {tool.name for tool in list_tools()}
-    for tool in build_toolset(store, retriever, min_score=min_score_from(pack)):
+    for tool in build_toolset(pack, store, retriever, min_score=min_score_from(pack)):
         # [TUTOR-WHY] 重复登记跳过，而不是报错：测试里会反复建 app
         if tool.name not in existing:
             register(tool)
