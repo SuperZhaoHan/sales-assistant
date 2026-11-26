@@ -1,0 +1,49 @@
+{
+  "text": "【阶段】B（临近到期、待核保，需持续跟进）——该保单到期日为 2026-01-20 [F1]，当前资产状态仍为待核保 [F2]，最近互动为 2025-12-20 [F3]，属于到期前需推进核保与续保确认的阶段。\n\n【建议动作】在 2026-01-20 到期日 [F1] 之前，围绕待核保状态 [F2] 与客户确认核保进度并推进续保手续。\n\n【话术】陈先生您好，您的定期寿险保单到期日为 2026-01-20，目前状态为待核保。想跟您确认一下核保所需的资料是否已齐备，方便的话我们约个时间把后续手续走完，具体条款详见险种说明。\n\n【依据】\n[F1] 2026-01-20\n[F2] 待核保\n[F3] 2025-12-20",
+  "model": "deepseek-flash",
+  "provider": "openai_compat",
+  "found": true,
+  "customer_name": "陈建国",
+  "facts": [
+    "2026-01-20",
+    "待核保",
+    "2025-12-20"
+  ],
+  "citations": [
+    {
+      "label": "[F1]",
+      "kind": "fact",
+      "ref_id": "F1",
+      "source": "2026-01-20",
+      "resolved": true
+    },
+    {
+      "label": "[F2]",
+      "kind": "fact",
+      "ref_id": "F2",
+      "source": "待核保",
+      "resolved": true
+    },
+    {
+      "label": "[F3]",
+      "kind": "fact",
+      "ref_id": "F3",
+      "source": "2025-12-20",
+      "resolved": true
+    }
+  ],
+  "traceable_rate": 1.0,
+  "usage": {
+    "input_tokens": 452,
+    "output_tokens": 213,
+    "total_tokens": 665,
+    "cost_usd": 0.00039119999999999997
+  },
+  "stop_reason": "stop",
+  "latency_ms": 2009.28,
+  "prompt_template": {
+    "name": "insurance_summary",
+    "version": "v1"
+  },
+  "llm_called": true
+}

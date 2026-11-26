@@ -1,0 +1,33 @@
+{
+  "text": "【阶段】D（信息不足，无法判定）——客户资料仅记录最近互动日，持有资产与到期日均无记录，缺少判断续保跟进阶段所需的关键字段 [F1]\n\n【建议动作】2026-09-02 后先通过一次联系补齐到期日与现有保障信息，再确定续保跟进节奏 [F1]\n\n【话术】王芳您好，我是李强顾问这边的助理。想跟您确认一下您目前手上保单的到期时间，方便的话回我一句就行。具体保障内容以险种说明为准，我们不在这里做条款解释。\n\n【依据】\n[F1] 2026-09-02",
+  "model": "deepseek-flash",
+  "provider": "openai_compat",
+  "found": true,
+  "customer_name": "王芳",
+  "facts": [
+    "2026-09-02"
+  ],
+  "citations": [
+    {
+      "label": "[F1]",
+      "kind": "fact",
+      "ref_id": "F1",
+      "source": "2026-09-02",
+      "resolved": true
+    }
+  ],
+  "traceable_rate": 1.0,
+  "usage": {
+    "input_tokens": 403,
+    "output_tokens": 140,
+    "total_tokens": 543,
+    "cost_usd": 0.0002889
+  },
+  "stop_reason": "stop",
+  "latency_ms": 1442.13,
+  "prompt_template": {
+    "name": "insurance_summary",
+    "version": "v1"
+  },
+  "llm_called": true
+}

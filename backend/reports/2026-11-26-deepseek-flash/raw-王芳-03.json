@@ -1,0 +1,33 @@
+{
+  "text": "【阶段】无法判定。客户资料仅记录负责顾问为李强，持有资产\"无记录\"，最近互动仅有一条日期 2026-09-02 [F1]；缺少到期日与资产状态字段，无法定位到 A/B/C/D 任一续保跟进阶段。\n\n【建议动作】建议在 2026-09-02 之后尽快（如当周内）先向客户确认现有保单的到期日与续保意向，再据到期日安排后续跟进；当前资料中的到期日与资产状态均为无记录 [F1]。\n\n【话术】王女士您好，我是李强顾问的助理。想跟您确认一下您现有保单的到期时间，方便我们提前把续保需要的信息准备好；具体保障与条款内容详见险种说明。您看这周哪天方便，我配合您的时间简单沟通一下？\n\n【依据】\n[F1] 2026-09-02",
+  "model": "deepseek-flash",
+  "provider": "openai_compat",
+  "found": true,
+  "customer_name": "王芳",
+  "facts": [
+    "2026-09-02"
+  ],
+  "citations": [
+    {
+      "label": "[F1]",
+      "kind": "fact",
+      "ref_id": "F1",
+      "source": "2026-09-02",
+      "resolved": true
+    }
+  ],
+  "traceable_rate": 1.0,
+  "usage": {
+    "input_tokens": 403,
+    "output_tokens": 196,
+    "total_tokens": 599,
+    "cost_usd": 0.0003561
+  },
+  "stop_reason": "stop",
+  "latency_ms": 2731.43,
+  "prompt_template": {
+    "name": "insurance_summary",
+    "version": "v1"
+  },
+  "llm_called": true
+}

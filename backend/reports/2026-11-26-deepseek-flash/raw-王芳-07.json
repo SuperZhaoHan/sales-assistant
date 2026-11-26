@@ -1,0 +1,33 @@
+{
+  "text": "【阶段】D，客户资料中无到期日记录，持有资产为无记录，最近互动仅见 2026-09-02，不足以判断续保跟进阶段，暂按待补充信息处理（引用 [F1]）\n【建议动作】请先向经纪人李强补齐该客户的保单到期日与资产状态记录，补齐后再确定跟进时间点，目前无记录可依据。\n【话术】王芳女士您好，我是李强顾问团队的助理。我们正在整理您的续保服务信息，目前系统里缺少您保单的到期时间等基础资料。方便的话请您回复确认，我们再和您对接后续安排，具体保障内容以险种说明为准。\n【依据】\n[F1] 2026-09-02",
+  "model": "deepseek-flash",
+  "provider": "openai_compat",
+  "found": true,
+  "customer_name": "王芳",
+  "facts": [
+    "2026-09-02"
+  ],
+  "citations": [
+    {
+      "label": "[F1]",
+      "kind": "fact",
+      "ref_id": "F1",
+      "source": "2026-09-02",
+      "resolved": true
+    }
+  ],
+  "traceable_rate": 1.0,
+  "usage": {
+    "input_tokens": 403,
+    "output_tokens": 159,
+    "total_tokens": 562,
+    "cost_usd": 0.0003117
+  },
+  "stop_reason": "stop",
+  "latency_ms": 2491.23,
+  "prompt_template": {
+    "name": "insurance_summary",
+    "version": "v1"
+  },
+  "llm_called": true
+}

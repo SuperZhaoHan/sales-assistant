@@ -1,0 +1,33 @@
+{
+  "text": "【阶段】D（信息不足，无法判定阶段）—— 该客户持有资产状态为\"无记录\"，最近互动仅有日期记录，均不足以判断所处续保跟进阶段；资料中亦无到期日信息。\n【建议动作】无记录可支撑具体时间点，建议先向顾问李强确认该客户保单到期日与资产明细，再决定推进节点（本项无可用引用编号）。\n【话术】王芳您好，我是李强顾问这边的助理。想跟您确认一下最近是否有需要我们协助处理的事项，方便时回个消息即可（本句无可用引用编号，仅作沟通开场）。具体条款与安排详见险种说明。\n【依据】\n[F1] 2026-09-02",
+  "model": "deepseek-flash",
+  "provider": "openai_compat",
+  "found": true,
+  "customer_name": "王芳",
+  "facts": [
+    "2026-09-02"
+  ],
+  "citations": [
+    {
+      "label": "[F1]",
+      "kind": "fact",
+      "ref_id": "F1",
+      "source": "2026-09-02",
+      "resolved": true
+    }
+  ],
+  "traceable_rate": 1.0,
+  "usage": {
+    "input_tokens": 403,
+    "output_tokens": 156,
+    "total_tokens": 559,
+    "cost_usd": 0.00030809999999999995
+  },
+  "stop_reason": "stop",
+  "latency_ms": 2344.41,
+  "prompt_template": {
+    "name": "insurance_summary",
+    "version": "v1"
+  },
+  "llm_called": true
+}

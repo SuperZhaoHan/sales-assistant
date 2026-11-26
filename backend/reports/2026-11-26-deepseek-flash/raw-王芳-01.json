@@ -1,0 +1,33 @@
+{
+  "text": "【阶段】待补充续保基准信息（无法判定 A/B/C/D）—— 客户资料中未提供保单到期日与持有资产记录，仅有的最近互动日期为 2026-09-02 [F1]，不足以定位续保跟进阶段。\n\n【建议动作】在 2026-09-02 之后尽快补齐该客户的到期日与资产状态，再确定跟进时间点 [F1]。\n\n【话术】王女士您好，我是李强顾问这边的助理。上次与您联系是 2026 年 9 月 2 日 [F1]，想向您确认一下目前保单的到期安排，方便的话回复一下，我们按您的节奏来整理。具体保障内容以险种说明为准。\n\n【依据】\n[F1] 2026-09-02",
+  "model": "deepseek-flash",
+  "provider": "openai_compat",
+  "found": true,
+  "customer_name": "王芳",
+  "facts": [
+    "2026-09-02"
+  ],
+  "citations": [
+    {
+      "label": "[F1]",
+      "kind": "fact",
+      "ref_id": "F1",
+      "source": "2026-09-02",
+      "resolved": true
+    }
+  ],
+  "traceable_rate": 1.0,
+  "usage": {
+    "input_tokens": 403,
+    "output_tokens": 172,
+    "total_tokens": 575,
+    "cost_usd": 0.0003273
+  },
+  "stop_reason": "stop",
+  "latency_ms": 1812.63,
+  "prompt_template": {
+    "name": "insurance_summary",
+    "version": "v1"
+  },
+  "llm_called": true
+}

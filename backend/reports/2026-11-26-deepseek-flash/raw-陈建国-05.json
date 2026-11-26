@@ -1,0 +1,49 @@
+{
+  "text": "【阶段】C — 客户名下定期寿险状态为待核保 [F2]，最近一次互动为 2025-12-20 [F3]，距到期日 2026-01-20 已不足一个月 [F1]，处于需尽快推进核保与续保衔接的跟进阶段。\n\n【建议动作】建议在 2026-01-20 到期日 [F1] 之前完成核保事项的确认与推进，最迟于 2026 年 1 月上旬与客户取得联系。\n\n【话术】陈先生您好，我是李强顾问这边的助理。您名下这份定期寿险目前状态为待核保 [F2]，保单到期日是 2026 年 1 月 20 日 [F1]，我们上次联系是 2025 年 12 月 20 日 [F3]。为不影响后续安排，想跟您约个方便的时间，把核保相关事项确认一下，具体条款以险种说明为准。\n\n【依据】\n[F1] 2026-01-20\n[F2] 待核保\n[F3] 2025-12-20",
+  "model": "deepseek-flash",
+  "provider": "openai_compat",
+  "found": true,
+  "customer_name": "陈建国",
+  "facts": [
+    "2026-01-20",
+    "待核保",
+    "2025-12-20"
+  ],
+  "citations": [
+    {
+      "label": "[F2]",
+      "kind": "fact",
+      "ref_id": "F2",
+      "source": "待核保",
+      "resolved": true
+    },
+    {
+      "label": "[F3]",
+      "kind": "fact",
+      "ref_id": "F3",
+      "source": "2025-12-20",
+      "resolved": true
+    },
+    {
+      "label": "[F1]",
+      "kind": "fact",
+      "ref_id": "F1",
+      "source": "2026-01-20",
+      "resolved": true
+    }
+  ],
+  "traceable_rate": 1.0,
+  "usage": {
+    "input_tokens": 452,
+    "output_tokens": 251,
+    "total_tokens": 703,
+    "cost_usd": 0.00043679999999999994
+  },
+  "stop_reason": "stop",
+  "latency_ms": 2529.09,
+  "prompt_template": {
+    "name": "insurance_summary",
+    "version": "v1"
+  },
+  "llm_called": true
+}

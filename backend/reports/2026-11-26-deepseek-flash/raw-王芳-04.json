@@ -1,0 +1,33 @@
+{
+  "text": "【阶段】无记录——现有资料只有最近互动日期 [F1] 2026-09-02，缺少到期日、持有资产与阶段判定所需信息，无法归入 A/B/C/D。\n【建议动作】无记录：资料中无到期日、无资产状态，无法确定需在哪个时间点前推进续保；建议先向顾问李强补齐该客户的到期日与资产状态后再定动作。\n【话术】王芳您好，我是李强顾问这边的助理，最近一次和您联系是 9 月 [F1]，想跟您确认一下现有保障的续保安排。目前我们这边还没有您的到期日与保单记录，方便的话请您回一下当前保单的到期时间，我们好提前对接，具体条款与保障内容详见险种说明。\n【依据】\n[F1] 2026-09-02",
+  "model": "deepseek-flash",
+  "provider": "openai_compat",
+  "found": true,
+  "customer_name": "王芳",
+  "facts": [
+    "2026-09-02"
+  ],
+  "citations": [
+    {
+      "label": "[F1]",
+      "kind": "fact",
+      "ref_id": "F1",
+      "source": "2026-09-02",
+      "resolved": true
+    }
+  ],
+  "traceable_rate": 1.0,
+  "usage": {
+    "input_tokens": 403,
+    "output_tokens": 183,
+    "total_tokens": 586,
+    "cost_usd": 0.0003405
+  },
+  "stop_reason": "stop",
+  "latency_ms": 2439.44,
+  "prompt_template": {
+    "name": "insurance_summary",
+    "version": "v1"
+  },
+  "llm_called": true
+}

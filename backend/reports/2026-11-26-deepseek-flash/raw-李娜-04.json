@@ -1,0 +1,65 @@
+{
+  "text": "【阶段】D —— 年金险（十年期）状态为待续保 [F3]，但到期日 2026-06-15 [F1] 已早于最近互动 2026-10-30 [F5]，属逾期未续保、需优先回捞的客户。\n\n【建议动作】以 2026-10-30 这次互动为节点，尽快核实该笔待续保年金险的实际状态并安排一次回访。\n\n【话术】李娜您好，我是王敏的助理。记录显示您有一份十年期年金险目前处于待续保状态，想跟您确认一下后续安排，方便的话我让王敏跟您对接。综合意外险已续保至 2027-01-01，这部分您不用担心。具体保障内容详见险种说明。\n\n【依据】\n[F1] 2026-06-15\n[F2] 2027-01-01\n[F3] 待续保\n[F4] 已续保\n[F5] 2026-10-30",
+  "model": "deepseek-flash",
+  "provider": "openai_compat",
+  "found": true,
+  "customer_name": "李娜",
+  "facts": [
+    "2026-06-15",
+    "2027-01-01",
+    "待续保",
+    "已续保",
+    "2026-10-30"
+  ],
+  "citations": [
+    {
+      "label": "[F3]",
+      "kind": "fact",
+      "ref_id": "F3",
+      "source": "待续保",
+      "resolved": true
+    },
+    {
+      "label": "[F1]",
+      "kind": "fact",
+      "ref_id": "F1",
+      "source": "2026-06-15",
+      "resolved": true
+    },
+    {
+      "label": "[F5]",
+      "kind": "fact",
+      "ref_id": "F5",
+      "source": "2026-10-30",
+      "resolved": true
+    },
+    {
+      "label": "[F2]",
+      "kind": "fact",
+      "ref_id": "F2",
+      "source": "2027-01-01",
+      "resolved": true
+    },
+    {
+      "label": "[F4]",
+      "kind": "fact",
+      "ref_id": "F4",
+      "source": "已续保",
+      "resolved": true
+    }
+  ],
+  "traceable_rate": 1.0,
+  "usage": {
+    "input_tokens": 501,
+    "output_tokens": 231,
+    "total_tokens": 732,
+    "cost_usd": 0.0004275
+  },
+  "stop_reason": "stop",
+  "latency_ms": 2043.45,
+  "prompt_template": {
+    "name": "insurance_summary",
+    "version": "v1"
+  },
+  "llm_called": true
+}

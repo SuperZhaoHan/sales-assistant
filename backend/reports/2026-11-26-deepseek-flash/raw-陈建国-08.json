@@ -1,0 +1,49 @@
+{
+  "text": "【阶段】B（临期核保待办跟进）\n判断理由：名下定期寿险资产状态为待核保 [F2]，到期日为 2026-01-20 [F1]，距该日期约一个月，最近一次互动为 2025-12-20 [F3]，当前处于核保待办需在到期前推进的阶段；其他跟进信息无记录。\n\n【建议动作】建议在 2026-01-20 到期日 [F1] 前，围绕待核保持续跟进，请客户配合补齐核保所需资料以推进状态更新 [F2]。\n\n【话术】陈先生您好，您的定期寿险目前处于待核保状态，保单到期日为 2026 年 1 月 20 日 [F1][F2]。为不影响后续安排，想和您确认一下核保所需资料的准备情况。具体条款与办理要求详见险种说明，我们可约您方便的时间沟通。\n\n【依据】\n[F1] 2026-01-20\n[F2] 待核保\n[F3] 2025-12-20",
+  "model": "deepseek-flash",
+  "provider": "openai_compat",
+  "found": true,
+  "customer_name": "陈建国",
+  "facts": [
+    "2026-01-20",
+    "待核保",
+    "2025-12-20"
+  ],
+  "citations": [
+    {
+      "label": "[F2]",
+      "kind": "fact",
+      "ref_id": "F2",
+      "source": "待核保",
+      "resolved": true
+    },
+    {
+      "label": "[F1]",
+      "kind": "fact",
+      "ref_id": "F1",
+      "source": "2026-01-20",
+      "resolved": true
+    },
+    {
+      "label": "[F3]",
+      "kind": "fact",
+      "ref_id": "F3",
+      "source": "2025-12-20",
+      "resolved": true
+    }
+  ],
+  "traceable_rate": 1.0,
+  "usage": {
+    "input_tokens": 452,
+    "output_tokens": 241,
+    "total_tokens": 693,
+    "cost_usd": 0.00042479999999999997
+  },
+  "stop_reason": "stop",
+  "latency_ms": 2324.18,
+  "prompt_template": {
+    "name": "insurance_summary",
+    "version": "v1"
+  },
+  "llm_called": true
+}

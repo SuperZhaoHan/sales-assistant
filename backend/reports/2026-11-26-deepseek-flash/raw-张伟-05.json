@@ -1,0 +1,65 @@
+{
+  "text": "【阶段】D — 重疾险到期日为 2026-03-01 且状态为待续保 [F1][F3]，医疗险到期日 2025-12-31 已失效 [F2][F4]，最近互动为 2026-11-18 [F5]，两个到期日均已过去且无后续互动记录，属需重新建联的脱保跟进阶段。\n\n【建议动作】以 2026-11-18 这次互动为触点，尽快安排一次电话或面谈，把两份保单的当前状态当面说清并确认客户意向。\n\n【话术】张伟您好，我是王敏的助理。看到您名下平安福终身重疾险目前是待续保状态（到期日 2026-03-01），百万医疗险已于 2025-12-31 到期失效。想跟您约个时间，把这两份保单的现状和后续手续当面对一遍，具体保障内容详见险种说明。\n\n【依据】\n[F1] 2026-03-01\n[F2] 2025-12-31\n[F3] 待续保\n[F4] 已失效\n[F5] 2026-11-18",
+  "model": "deepseek-flash",
+  "provider": "openai_compat",
+  "found": true,
+  "customer_name": "张伟",
+  "facts": [
+    "2026-03-01",
+    "2025-12-31",
+    "待续保",
+    "已失效",
+    "2026-11-18"
+  ],
+  "citations": [
+    {
+      "label": "[F1]",
+      "kind": "fact",
+      "ref_id": "F1",
+      "source": "2026-03-01",
+      "resolved": true
+    },
+    {
+      "label": "[F3]",
+      "kind": "fact",
+      "ref_id": "F3",
+      "source": "待续保",
+      "resolved": true
+    },
+    {
+      "label": "[F2]",
+      "kind": "fact",
+      "ref_id": "F2",
+      "source": "2025-12-31",
+      "resolved": true
+    },
+    {
+      "label": "[F4]",
+      "kind": "fact",
+      "ref_id": "F4",
+      "source": "已失效",
+      "resolved": true
+    },
+    {
+      "label": "[F5]",
+      "kind": "fact",
+      "ref_id": "F5",
+      "source": "2026-11-18",
+      "resolved": true
+    }
+  ],
+  "traceable_rate": 1.0,
+  "usage": {
+    "input_tokens": 499,
+    "output_tokens": 267,
+    "total_tokens": 766,
+    "cost_usd": 0.0004701
+  },
+  "stop_reason": "stop",
+  "latency_ms": 3060.52,
+  "prompt_template": {
+    "name": "insurance_summary",
+    "version": "v1"
+  },
+  "llm_called": true
+}

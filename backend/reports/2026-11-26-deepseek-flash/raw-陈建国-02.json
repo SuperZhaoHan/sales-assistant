@@ -1,0 +1,49 @@
+{
+  "text": "【阶段】B —— 定期寿险到期日为 2026-01-20 [F1]，当前资产状态仍为“待核保” [F2]，最近互动为 2025-12-20 [F3]，属于到期前需推进核保的跟进阶段。\n\n【建议动作】建议在 2026-01-20 到期日前完成核保事项的推进，并确认客户后续安排 [F1]。\n\n【话术】陈先生您好，您的定期寿险保单到期日为 2026-01-20，目前资产状态显示为“待核保”。想跟您确认一下后续安排，方便时回复我即可。具体保障内容详见险种说明。\n\n【依据】\n[F1] 2026-01-20\n[F2] 待核保\n[F3] 2025-12-20",
+  "model": "deepseek-flash",
+  "provider": "openai_compat",
+  "found": true,
+  "customer_name": "陈建国",
+  "facts": [
+    "2026-01-20",
+    "待核保",
+    "2025-12-20"
+  ],
+  "citations": [
+    {
+      "label": "[F1]",
+      "kind": "fact",
+      "ref_id": "F1",
+      "source": "2026-01-20",
+      "resolved": true
+    },
+    {
+      "label": "[F2]",
+      "kind": "fact",
+      "ref_id": "F2",
+      "source": "待核保",
+      "resolved": true
+    },
+    {
+      "label": "[F3]",
+      "kind": "fact",
+      "ref_id": "F3",
+      "source": "2025-12-20",
+      "resolved": true
+    }
+  ],
+  "traceable_rate": 1.0,
+  "usage": {
+    "input_tokens": 452,
+    "output_tokens": 183,
+    "total_tokens": 635,
+    "cost_usd": 0.0003552
+  },
+  "stop_reason": "stop",
+  "latency_ms": 1726.81,
+  "prompt_template": {
+    "name": "insurance_summary",
+    "version": "v1"
+  },
+  "llm_called": true
+}

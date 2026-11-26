@@ -1,0 +1,33 @@
+{
+  "text": "【阶段】D — 无法判定阶段：仅知最近互动为 2026-09-02，无到期日、无资产状态等字段可判定所处阶段 [F1]\n【建议动作】在 2026-09-02 之后的首次联络中，先向客户确认现有保单的到期日与当前持有资产情况，再决定后续跟进节奏 [F1]\n【话术】王芳您好，我是李强顾问这边的助理。想跟您确认一下您现有保单的到期时间，方便我们提前为您安排后续事项；具体保障内容详见险种说明。您看近期哪天方便简单沟通一下？\n【依据】\n[F1] 2026-09-02",
+  "model": "deepseek-flash",
+  "provider": "openai_compat",
+  "found": true,
+  "customer_name": "王芳",
+  "facts": [
+    "2026-09-02"
+  ],
+  "citations": [
+    {
+      "label": "[F1]",
+      "kind": "fact",
+      "ref_id": "F1",
+      "source": "2026-09-02",
+      "resolved": true
+    }
+  ],
+  "traceable_rate": 1.0,
+  "usage": {
+    "input_tokens": 403,
+    "output_tokens": 148,
+    "total_tokens": 551,
+    "cost_usd": 0.0002985
+  },
+  "stop_reason": "stop",
+  "latency_ms": 1756.53,
+  "prompt_template": {
+    "name": "insurance_summary",
+    "version": "v1"
+  },
+  "llm_called": true
+}
