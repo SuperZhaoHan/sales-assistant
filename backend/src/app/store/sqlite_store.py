@@ -41,10 +41,16 @@ CREATE INDEX IF NOT EXISTS idx_contacts_name ON contacts(name);
 CREATE INDEX IF NOT EXISTS idx_assets_contact ON assets(contact_id);
 """
 
-# 白名单：表名不参与 SQL 拼接，静态扫描（bandit B608）也不会报
+# 白名单：表名/列名不参与 SQL 拼接，静态扫描（bandit B608）也不会报
 _RAW_QUERIES = {
     "contacts": "SELECT * FROM contacts",
     "assets": "SELECT * FROM assets",
+}
+
+# 允许改的列也走白名单：(表, 列) -> SQL。没有这条约束，就等于把「改哪一列」交给调用方。
+_UPDATES = {
+    ("contacts", "last_interaction_at"): "UPDATE contacts SET last_interaction_at = ? WHERE id = ?",
+    ("assets", "status"): "UPDATE assets SET status = ? WHERE id = ?",
 }
 
 
@@ -150,6 +156,38 @@ class CustomerStore:
         if not rows:
             raise ValidationError(f"种子文件为空：{path.name}", details={"path": str(path)})
         return rows
+
+    # ------------------------------------------------------------------ 写入
+
+    def record_interaction(self, contact_id: str, at: str) -> None:
+        """更新「最近互动时间」。
+
+        库是唯一真相源：这里改完，下一次查询立刻看到新值 —— 任何一层都不该缓存
+        ``last_interaction_at``，否则「改库后再问」就会拿到旧答案。
+        """
+        self._update("contacts", "last_interaction_at", at, contact_id)
+
+    def set_asset_status(self, asset_id: str, status: str) -> None:
+        """更新资产状态（待续保 / 已续保 / 已失效…）。取值由业务方保证，这一层不校验枚举。"""
+        self._update("assets", "status", status, asset_id)
+
+    def _update(self, table: str, column: str, value: str, row_id: str) -> None:
+        # [TUTOR-WHY] 表和列都走白名单：更新语句一旦允许拼接，注入的入口就开了
+        query = _UPDATES.get((table, column))
+        if query is None:
+            raise ValidationError(
+                f"不允许更新 {table}.{column}",
+                details={"table": table, "column": column},
+            )
+        with self._lock:
+            cursor = self.conn.execute(query, (value, row_id))
+            self.conn.commit()
+        # [TUTOR-WHY] 行不存在就报错，不静默成功：否则「改库」这一步失败了却看起来成功了
+        if cursor.rowcount == 0:
+            raise ValidationError(
+                f"要更新的行不存在：{row_id}",
+                details={"table": table, "column": column, "id": row_id},
+            )
 
     # ------------------------------------------------------------------ 查询
 
