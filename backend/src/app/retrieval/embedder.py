@@ -11,8 +11,15 @@
 from __future__ import annotations
 
 import hashlib
+import math
 import re
+from collections.abc import Sequence
 from typing import Protocol
+
+import httpx
+
+from app.core.errors import ConfigurationError, ExternalServiceError
+from app.security.secrets.base import SecretValue
 
 # 只保留中文与字母数字，标点、空格、换行一律丢掉 —— 否则「，」也会被算进特征
 _KEEP = re.compile(r"[^\u4e00-\u9fffA-Za-z0-9]+")
@@ -25,6 +32,8 @@ class Embedder(Protocol):
 
     def embed(self, text: str) -> tuple[float, ...]: ...
 
+    def embed_many(self, texts: Sequence[str]) -> tuple[tuple[float, ...], ...]: ...
+
 
 class HashingEmbedder:
     """字符 n-gram 哈希到固定维度，再归一化。"""
@@ -35,6 +44,9 @@ class HashingEmbedder:
         if dim <= 0:
             raise ValueError("dim 必须为正数")
         self.dim = dim
+
+    def embed_many(self, texts: Sequence[str]) -> tuple[tuple[float, ...], ...]:
+        return tuple(self.embed(text) for text in texts)
 
     def embed(self, text: str) -> tuple[float, ...]:
         cleaned = _KEEP.sub(" ", text).strip().lower()
@@ -70,3 +82,102 @@ class HashingEmbedder:
         # [TUTOR-WHY] 评测数字就不可复现了。
         digest = hashlib.blake2b(gram.encode("utf-8"), digest_size=8).digest()
         return int.from_bytes(digest, "big") % self.dim
+
+
+class OpenAICompatEmbedder:
+    """OpenAI 兼容的 ``POST {base_url}/embeddings`` 适配器（硅基流动 bge-m3 走这条）。
+
+    三个必须做的事：
+    1. 批量：30 条语料一次请求，而不是 30 次 HTTP；
+    2. 归一化：存储层用点积当相似度，只对单位向量等于余弦 —— 不归一化分数会偏；
+    3. 维度校验：模型换版本改了维度，必须立刻报错，否则全库分数静默算错。
+    """
+
+    def __init__(
+        self,
+        api_key: SecretValue,
+        base_url: str,
+        model: str,
+        dim: int,
+        *,
+        timeout_seconds: float = 30.0,
+        batch_size: int = 32,
+    ) -> None:
+        if not base_url:
+            raise ConfigurationError("embedding.base_url 必填（provider=openai_compat）")
+        if batch_size < 1:
+            raise ConfigurationError("embedding.batch_size 必须为正数")
+        self.dim = dim
+        self._api_key = api_key
+        self._base_url = base_url.rstrip("/")
+        self._model = model
+        self._batch_size = batch_size
+        self._client = httpx.Client(timeout=timeout_seconds)
+
+    def embed(self, text: str) -> tuple[float, ...]:
+        return self.embed_many([text])[0]
+
+    def embed_many(self, texts: Sequence[str]) -> tuple[tuple[float, ...], ...]:
+        vectors: list[tuple[float, ...]] = []
+        for start in range(0, len(texts), self._batch_size):
+            vectors.extend(self._request(list(texts[start : start + self._batch_size])))
+        return tuple(vectors)
+
+    def _request(self, batch: list[str]) -> list[tuple[float, ...]]:
+        try:
+            response = self._client.post(
+                f"{self._base_url}/embeddings",
+                json={"model": self._model, "input": batch, "encoding_format": "float"},
+                headers={"Authorization": f"Bearer {self._api_key.reveal()}"},
+            )
+        except httpx.HTTPError as exc:
+            raise ExternalServiceError(
+                "embedding 请求失败",
+                provider="embedding",
+                operation="embeddings",
+                retryable=True,
+                cause=exc,
+            ) from exc
+
+        if response.status_code >= 400:
+            raise ExternalServiceError(
+                f"embedding 返回 HTTP {response.status_code}",
+                provider="embedding",
+                operation="embeddings",
+                status_code=response.status_code,
+                retryable=response.status_code in {408, 409, 429} or response.status_code >= 500,
+            )
+
+        try:
+            rows = response.json()["data"]
+            raw = [row["embedding"] for row in rows]
+        except (ValueError, KeyError, TypeError) as exc:
+            raise ExternalServiceError(
+                "embedding 响应格式非法",
+                provider="embedding",
+                operation="embeddings",
+                cause=exc,
+            ) from exc
+
+        if len(raw) != len(batch):
+            raise ExternalServiceError(
+                f"embedding 返回条数不符：要 {len(batch)} 条，拿到 {len(raw)} 条",
+                provider="embedding",
+                operation="embeddings",
+            )
+        return [_normalize(vector, self.dim) for vector in raw]
+
+    def aclose(self) -> None:
+        self._client.close()
+
+
+def _normalize(vector: Sequence[float], dim: int) -> tuple[float, ...]:
+    if len(vector) != dim:
+        raise ConfigurationError(
+            f"embedding 维度不符：配置 {dim}，模型返回 {len(vector)}；改配置里的 embedding.dim"
+        )
+    values = tuple(float(value) for value in vector)
+    norm = math.sqrt(sum(value * value for value in values))
+    if norm == 0.0:
+        return values
+    return tuple(value / norm for value in values)

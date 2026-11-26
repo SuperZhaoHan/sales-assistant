@@ -137,6 +137,21 @@ class RiskConfig(BaseModel):
     budget_enabled: bool = True
 
 
+class EmbeddingConfig(BaseModel):
+    """向量化配置。哈希版零依赖，真模型版走 OpenAI 兼容的 /embeddings。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: Literal["hash", "openai_compat"] = "hash"
+    model: str = "hash-256"
+    base_url: str | None = None
+    api_key_ref: str | None = None
+    timeout_seconds: float = Field(default=30.0, gt=0)
+    batch_size: int = Field(default=32, ge=1, le=256)
+    # 维度必须显式写：假模型靠配置分桶，真模型靠它校验返回值，写错要立刻报错而不是静默算错
+    dim: int = Field(default=256, gt=0)
+
+
 class RedisConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -162,6 +177,7 @@ class AppConfig(BaseModel):
     secrets: SecretsConfig = Field(default_factory=SecretsConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
     risk: RiskConfig = Field(default_factory=RiskConfig)
+    embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
     redis: RedisConfig = Field(default_factory=RedisConfig)
     observability: ObservabilityConfig = Field(default_factory=ObservabilityConfig)
 

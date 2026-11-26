@@ -64,10 +64,12 @@ class Retriever:
 
     # [TUTOR-WHY] 标题拼进向量里：客户说「重疾」时，标题「重疾险等待期」能补上字面匹配的分
     def index(self, chunks: Sequence[Chunk]) -> int:
-        for chunk in chunks:
-            # 标题和标签也参与向量：客户说「重疾」时，标题里的「重疾险」能补上一点分
-            text = f"{chunk.title}。{chunk.text}"
-            self._store.add(chunk, self._embedder.embed(text))
+        # 标题和标签也参与向量：客户说「重疾」时，标题里的「重疾险」能补上一点分
+        texts = [f"{chunk.title}。{chunk.text}" for chunk in chunks]
+        # 一次批量拿全部向量：真模型按 HTTP 计费/计时，逐条 embed 会把 30 条语料变成 30 次请求
+        vectors = self._embedder.embed_many(texts)
+        for chunk, vector in zip(chunks, vectors, strict=True):
+            self._store.add(chunk, vector)
         return len(self._store)
 
     def search(

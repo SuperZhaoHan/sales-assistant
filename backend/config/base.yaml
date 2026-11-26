@@ -59,6 +59,15 @@ llm:
   pii_masking_enabled: false
   stream: false
 
+embedding:
+  provider: hash          # hash | openai_compat（接真模型时改成后者）
+  model: hash-256         # 真模型用 BAAI/bge-m3（硅基流动，1024 维，免费）
+  base_url: null
+  api_key_ref: null
+  timeout_seconds: 30
+  batch_size: 32
+  dim: 256
+
 risk:
   enabled: true
   fail_closed: true

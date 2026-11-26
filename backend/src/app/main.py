@@ -19,6 +19,7 @@ from app.llm.factory import build_llm_gateway
 from app.observability.health import router as health_router
 from app.observability.metrics import router as metrics_router
 from app.observability.tracing import setup_tracing
+from app.retrieval.factory import build_embedder_from_settings
 from app.risk.engine import build_risk_engine
 from app.security.secrets.factory import build_secret_resolver, validate_required_secrets
 from app.tools.bootstrap import bootstrap_domain
@@ -37,7 +38,8 @@ def create_app(settings: AppConfig | None = None) -> FastAPI:
         secrets = build_secret_resolver(settings)
         await validate_required_secrets(settings, secrets)
         # 密钥校验通过之后才碰外部资源：配错了不该先建出一个空库
-        boot = bootstrap_domain(domain, settings.app.store_path)
+        embedder = await build_embedder_from_settings(settings.embedding, secrets)
+        boot = bootstrap_domain(domain, settings.app.store_path, embedder)
         # 工具没登记，模型点名也调不到
         tools = boot.tools
         risk = build_risk_engine(settings)
@@ -58,6 +60,7 @@ def create_app(settings: AppConfig | None = None) -> FastAPI:
             templates=len(domain.templates),
             rules=domain.rule_count,
             provider=settings.llm.provider,
+            embedding=f"{settings.embedding.provider}:{settings.embedding.model}",
             model=settings.llm.model,
             risk_enabled=settings.risk.enabled,
             contacts=boot.store.contact_count(),

@@ -11,6 +11,7 @@ from pathlib import Path
 
 from app.core.errors import ValidationError
 from app.domains.registry import DomainPack
+from app.retrieval.embedder import Embedder
 from app.retrieval.retriever import Retriever, load_chunks
 from app.store.sqlite_store import CustomerStore
 from app.tools.base import Tool
@@ -40,14 +41,15 @@ def open_store(store_path: str | Path, seed_dir: str | Path) -> CustomerStore:
     return store
 
 
-def build_retriever(corpus_dir: str | Path) -> Retriever:
+def build_retriever(corpus_dir: str | Path, embedder: Embedder | None = None) -> Retriever:
     """把 ``corpus/*.yaml`` 全部灌进索引。语料按行业拆文件即可。"""
     directory = Path(corpus_dir)
     files = sorted(directory.glob("*.yaml"))
     if not files:
         raise ValidationError(f"语料目录为空：{directory.name}", details={"path": str(directory)})
 
-    retriever = Retriever()
+    # 不传 embedder 就用哈希版：CI 里不许联网，测试必须能在无密钥环境跑绿
+    retriever = Retriever(embedder)
     for file in files:
         retriever.index(load_chunks(file))
     return retriever
@@ -102,8 +104,10 @@ def register_domain_tools(
     return tuple(tool.name for tool in list_tools())
 
 
-def bootstrap_domain(pack: DomainPack, store_path: str | Path) -> Bootstrap:
+def bootstrap_domain(
+    pack: DomainPack, store_path: str | Path, embedder: Embedder | None = None
+) -> Bootstrap:
     store = open_store(store_path, pack.root / "seed")
-    retriever = build_retriever(pack.root / "corpus")
+    retriever = build_retriever(pack.root / "corpus", embedder)
     tools = register_domain_tools(pack, store, retriever)
     return Bootstrap(store=store, retriever=retriever, tools=tools, min_score=min_score_from(pack))
