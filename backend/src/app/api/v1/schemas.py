@@ -56,3 +56,41 @@ class ChatResponse(BaseModel):
 class ChatEnvelope(BaseModel):
     ok: bool = True
     data: ChatResponse
+
+
+class SummaryRequest(BaseModel):
+    """按客户名生成续保摘要。
+
+    与 ``/chat`` 的区别：调用方不必自己拼提示词，也不传历史消息——
+    资料由后端查库得来，模型只看后端给的事实。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    customer_name: str = Field(min_length=1, max_length=40)
+    subject_id: str = Field(default="anonymous", min_length=1, max_length=128)
+    tenant_id: str | None = Field(default=None, max_length=128)
+    model: str | None = Field(default=None, max_length=128)
+    max_tokens: int | None = Field(default=None, gt=0, le=128_000)
+    temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+
+
+class SummaryResponse(BaseModel):
+    text: str
+    model: str
+    provider: str
+    # 查到了这个客户吗；查不到时 text 是固定话术，llm_called=False、token 全 0
+    found: bool
+    customer_name: str
+    # 本次可用来校验摘要的事实清单（到期日/状态/最近互动），供上游做引用反查
+    facts: list[str]
+    usage: UsageResponse
+    stop_reason: str | None = None
+    latency_ms: float
+    prompt_template: dict[str, str] | None = None
+    llm_called: bool
+
+
+class SummaryEnvelope(BaseModel):
+    ok: bool = True
+    data: SummaryResponse

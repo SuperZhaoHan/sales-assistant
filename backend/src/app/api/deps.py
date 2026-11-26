@@ -6,9 +6,11 @@ from fastapi import Request
 
 from app.core.config import AppConfig
 from app.core.errors import ConfigurationError
+from app.domains.registry import DomainPack
 from app.llm.gateway import LLMGateway
 from app.risk.engine import RiskEngine
 from app.security.secrets.resolver import SecretResolver
+from app.store.sqlite_store import CustomerStore
 
 
 def get_settings(request: Request) -> AppConfig:
@@ -34,3 +36,17 @@ def get_secret_resolver(request: Request) -> SecretResolver:
     if resolver is None:
         raise ConfigurationError("secret resolver is not initialized")
     return cast(SecretResolver, resolver)
+
+
+def get_store(request: Request) -> CustomerStore:
+    store = getattr(request.app.state, "store", None)
+    if store is None:
+        raise ConfigurationError("customer store is not initialized")
+    return cast(CustomerStore, store)
+
+
+def get_domain(request: Request) -> DomainPack:
+    domain = getattr(request.app.state, "domain", None)
+    if domain is None:
+        raise ConfigurationError("domain pack is not initialized")
+    return cast(DomainPack, domain)

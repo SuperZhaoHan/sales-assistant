@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.chat import router as chat_router
 from app.api.v1.demo import router as demo_router
+from app.api.v1.summary import router as summary_router
 from app.core.config import AppConfig, load_config
 from app.core.exception_handlers import register_exception_handlers
 from app.core.logging import configure_logging
@@ -102,6 +103,7 @@ def create_app(settings: AppConfig | None = None) -> FastAPI:
     register_exception_handlers(app)
     app.include_router(health_router)
     app.include_router(chat_router, prefix="/v1")
+    app.include_router(summary_router, prefix="/v1")
     if settings.env in {"local", "test"}:
         app.include_router(demo_router, prefix="/v1")
 
