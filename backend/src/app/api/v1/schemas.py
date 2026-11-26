@@ -4,6 +4,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.agent.citation import CitationKind
+
 
 class ChatMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -82,7 +84,7 @@ class CitationResponse(BaseModel):
     """
 
     label: str
-    kind: Literal["fact", "knowledge", "unknown"]
+    kind: CitationKind
     ref_id: str
     source: str
     resolved: bool

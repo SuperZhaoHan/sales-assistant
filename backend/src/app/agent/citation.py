@@ -14,9 +14,14 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import Literal
 
 # [F1] / [K12]：只认大写单字母 + 数字，避免把正文里的 [1] 之类误判成引用
 CITATION_PATTERN = re.compile(r"\[([FK])(\d+)]")
+
+
+# 引用来源只有三种：事实、知识块、查不到。用 Literal 让 mypy 管住拼写，
+CitationKind = Literal["fact", "knowledge", "unknown"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,7 +29,7 @@ class Citation:
     """一条引用。``resolved=False`` 时 ``source`` 为空 —— 说明这个编号后端发过没有。"""
 
     label: str
-    kind: str
+    kind: CitationKind
     ref_id: str
     source: str
     resolved: bool
@@ -33,9 +38,9 @@ class Citation:
 def build_catalog(
     facts: tuple[str, ...],
     chunks: tuple[tuple[str, str], ...] = (),
-) -> dict[str, tuple[str, str, str]]:
+) -> dict[str, tuple[CitationKind, str, str]]:
     """编号 → (kind, ref_id, 原文)。``chunks`` 是 ``(chunk_id, text)`` 的有序列表。"""
-    catalog: dict[str, tuple[str, str, str]] = {}
+    catalog: dict[str, tuple[CitationKind, str, str]] = {}
     for index, value in enumerate(facts, start=1):
         # [TUTOR-WHY] 事实的 ref_id 用序号：facts 里没有主键，取「第几条」最稳，也不泄露库结构
         catalog[f"F{index}"] = ("fact", f"F{index}", value)
@@ -46,7 +51,7 @@ def build_catalog(
 
 def resolve_citations(
     answer: str,
-    catalog: dict[str, tuple[str, str, str]],
+    catalog: dict[str, tuple[CitationKind, str, str]],
 ) -> tuple[tuple[Citation, ...], float | None]:
     """解析答案里出现过的编号，返回（引用列表，可追溯率）。
 
