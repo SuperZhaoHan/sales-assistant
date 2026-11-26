@@ -114,6 +114,11 @@ class OpenAICompatEmbedder:
         self._batch_size = batch_size
         self._client = httpx.Client(timeout=timeout_seconds)
 
+    @property
+    def model(self) -> str:
+        """给日志/评测脚本用：真跑起来必须能说清「用的是哪把尺子」。"""
+        return self._model
+
     def embed(self, text: str) -> tuple[float, ...]:
         return self.embed_many([text])[0]
 

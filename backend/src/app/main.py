@@ -39,7 +39,9 @@ def create_app(settings: AppConfig | None = None) -> FastAPI:
         await validate_required_secrets(settings, secrets)
         # 密钥校验通过之后才碰外部资源：配错了不该先建出一个空库
         embedder = await build_embedder_from_settings(settings.embedding, secrets)
-        boot = bootstrap_domain(domain, settings.app.store_path, embedder)
+        boot = bootstrap_domain(
+            domain, settings.app.store_path, embedder, min_score=settings.retrieval.min_score
+        )
         # 工具没登记，模型点名也调不到
         tools = boot.tools
         risk = build_risk_engine(settings)

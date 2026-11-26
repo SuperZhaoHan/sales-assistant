@@ -152,6 +152,19 @@ class EmbeddingConfig(BaseModel):
     dim: int = Field(default=256, gt=0)
 
 
+class RetrievalConfig(BaseModel):
+    """检索策略。``min_score`` 为空表示用 domain pack 里的行业阈值。
+
+    为什么允许在配置层覆盖：分数尺度是 embedding 决定的，不是行业决定的。
+    换一把尺子（哈希 256 维 → bge-m3 1024 维）同一批题的顶分会整体抬高，
+    阈值必须跟着重扫；把它钉死在 pack 里，换模型就等于悄悄改判断标准。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    min_score: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
 class RedisConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -178,6 +191,7 @@ class AppConfig(BaseModel):
     llm: LLMConfig = Field(default_factory=LLMConfig)
     risk: RiskConfig = Field(default_factory=RiskConfig)
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
+    retrieval: RetrievalConfig = Field(default_factory=RetrievalConfig)
     redis: RedisConfig = Field(default_factory=RedisConfig)
     observability: ObservabilityConfig = Field(default_factory=ObservabilityConfig)
 

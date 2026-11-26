@@ -6,9 +6,11 @@
 
 from __future__ import annotations
 
+import argparse
 import time
 
 import yaml
+from eval_common import build_embedder, describe, effective_min_score
 
 from app.domains import load_domain
 from app.retrieval.retriever import Retriever, load_chunks
@@ -17,8 +19,18 @@ TOP_K = 3
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="金标集 hit@3 + 单次检索耗时")
+    parser.add_argument(
+        "--embedder",
+        choices=("hash", "real"),
+        default="hash",
+        help="hash=本地假向量（不联网）；real=按 .env 调真 embedding",
+    )
+    args = parser.parse_args()
+
     pack = load_domain("insurance")
-    retriever = Retriever()
+    embedder = build_embedder(args.embedder)
+    retriever = Retriever(embedder)
 
     started = time.perf_counter()
     for file in sorted((pack.root / "corpus").glob("*.yaml")):
@@ -27,9 +39,12 @@ def main() -> None:
 
     gold = yaml.safe_load((pack.root / "eval" / "gold.yaml").read_text(encoding="utf-8"))
     questions = gold["questions"]
-    min_score = float(pack.rules["thresholds"]["retrieval_min_score"])
+    min_score = effective_min_score(pack)
 
-    print(f"语料 {retriever.size} 条，建索引 {index_ms:.1f} ms，阈值 {min_score}\n")
+    print(
+        f"embedder {describe(embedder)}，语料 {retriever.size} 条，"
+        f"建索引 {index_ms:.1f} ms，阈值 {min_score}\n"
+    )
 
     answerable = [row for row in questions if row["expect"]]
     unanswerable = [row for row in questions if not row["expect"]]
@@ -54,7 +69,8 @@ def main() -> None:
         print(f"  {row['q']}  → top1 {top1.chunk.id if top1 else '-'} ({top1.score:.2f})")
 
     # 单次检索耗时
-    rounds = 200
+    # 真 embedding 每次检索都是一次 HTTP 请求：跑 200 轮要几十秒还烧配额，取 5 轮够看量级
+    rounds = 200 if args.embedder == "hash" else 5
     started = time.perf_counter()
     for _ in range(rounds):
         retriever.search("重疾险等待期多久", top_k=TOP_K)

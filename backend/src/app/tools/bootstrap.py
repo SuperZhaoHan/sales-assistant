@@ -55,8 +55,15 @@ def build_retriever(corpus_dir: str | Path, embedder: Embedder | None = None) ->
     return retriever
 
 
-def min_score_from(pack: DomainPack) -> float:
-    """阈值来自 pack，不写死在代码里 —— 换行业时这个值一定不一样。"""
+def min_score_from(pack: DomainPack, override: float | None = None) -> float:
+    """阈值优先取配置覆盖，没覆盖才回落到 pack。
+
+    为什么要有覆盖：分数尺度由 embedding 决定（哈希 256 维 vs bge-m3 1024 维
+    同一批题的顶分会整体抬高），而行业包只该管业务口径。不覆盖就等于换模型
+    时悄悄改了「答不答」的判断标准。
+    """
+    if override is not None:
+        return float(override)
     thresholds = pack.rules.get("thresholds") or {}
     return float(thresholds.get("retrieval_min_score", DEFAULT_MIN_SCORE))
 
@@ -89,14 +96,19 @@ def build_toolset(
 
 
 def register_domain_tools(
-    pack: DomainPack, store: CustomerStore, retriever: Retriever
+    pack: DomainPack,
+    store: CustomerStore,
+    retriever: Retriever,
+    *,
+    min_score: float | None = None,
 ) -> tuple[str, ...]:
     """登记业务工具，返回注册表里的全部工具名。
 
     已经登记过就跳过：测试里会反复创建 app，启动期重复登记不该被当成错误。
     """
     existing = {tool.name for tool in list_tools()}
-    for tool in build_toolset(pack, store, retriever, min_score=min_score_from(pack)):
+    effective = min_score_from(pack, min_score)
+    for tool in build_toolset(pack, store, retriever, min_score=effective):
         # [TUTOR-WHY] 重复登记跳过，而不是报错：测试里会反复建 app
         if tool.name not in existing:
             register(tool)
@@ -105,9 +117,14 @@ def register_domain_tools(
 
 
 def bootstrap_domain(
-    pack: DomainPack, store_path: str | Path, embedder: Embedder | None = None
+    pack: DomainPack,
+    store_path: str | Path,
+    embedder: Embedder | None = None,
+    *,
+    min_score: float | None = None,
 ) -> Bootstrap:
     store = open_store(store_path, pack.root / "seed")
     retriever = build_retriever(pack.root / "corpus", embedder)
-    tools = register_domain_tools(pack, store, retriever)
-    return Bootstrap(store=store, retriever=retriever, tools=tools, min_score=min_score_from(pack))
+    tools = register_domain_tools(pack, store, retriever, min_score=min_score)
+    effective = min_score_from(pack, min_score)
+    return Bootstrap(store=store, retriever=retriever, tools=tools, min_score=effective)

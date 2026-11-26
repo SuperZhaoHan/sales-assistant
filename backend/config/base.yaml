@@ -68,6 +68,11 @@ embedding:
   batch_size: 32
   dim: 256
 
+retrieval:
+  # 空 = 用 domain pack 里的行业阈值（哈希基线 0.35）。
+  # 换 embedding 后必须重扫并在 .env 里覆盖：APP__RETRIEVAL__MIN_SCORE=0.64
+  min_score: null
+
 risk:
   enabled: true
   fail_closed: true

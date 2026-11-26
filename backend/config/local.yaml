@@ -16,3 +16,8 @@ risk:
 
 observability:
   otel_enabled: false
+
+retrieval:
+  # bge-m3 实测：该答 top1 0.65–0.83、该拒 0.48–0.63，无重叠 → 取中点 0.64
+  # 哈希 embedding 下这个值会误拒一片，所以只放 local/prod，不写进 base
+  min_score: 0.64
