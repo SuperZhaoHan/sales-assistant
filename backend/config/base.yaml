@@ -76,6 +76,10 @@ retrieval:
   backend: memory
   table: chunks
   dsn: null
+  # 启动期索引行为：
+  #   sync     = 只给新增/正文变更的条目算向量（无变更 → 0 次 embedding，默认）
+  #   readonly = 启动不写库，只对账；库与语料不一致直接启动失败（库由 build_index.py 负责）
+  indexing: sync
 
 risk:
   enabled: true

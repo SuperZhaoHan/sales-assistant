@@ -169,6 +169,9 @@ class RetrievalConfig(BaseModel):
     dsn: str | None = None
     # 表名走白名单式校验：表名会拼进 SQL，不能让配置随手写一句进来的东西
     table: str = Field(default="chunks", pattern=r"^[a-z][a-z0-9_]{0,62}$")
+    # 启动期索引行为：sync=只补新增/变更（幂等，无变更即 0 次 embedding）；
+    # readonly=启动不写库，只对账，不一致就失败——库由离线脚本负责
+    indexing: Literal["sync", "readonly"] = "sync"
 
     @model_validator(mode="after")
     def validate_backend(self) -> Self:

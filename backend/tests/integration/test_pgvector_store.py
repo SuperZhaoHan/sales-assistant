@@ -16,6 +16,7 @@ import pytest
 pytest.importorskip("psycopg", reason="pgvector 后端需要 psycopg（pip install 'psycopg[binary]'）")
 
 from app.retrieval.embedder import HashingEmbedder  # noqa: E402
+from app.retrieval.fingerprint import content_sha  # noqa: E402
 from app.retrieval.store import Chunk, MemoryVectorStore, PgVectorStore  # noqa: E402
 
 DSN = os.getenv("PG_TEST_DSN", "")
@@ -83,3 +84,25 @@ def test_upsert_is_idempotent(stores, chunks) -> None:
         cursor.execute(f"SELECT COUNT(*) FROM {TABLE} WHERE id = %(id)s", {"id": "kb-1"})
         count = cursor.fetchone()[0]
     assert count == 1
+
+
+def test_content_sha_matches_memory_and_prune(chunks) -> None:
+    """指纹必须两边同源：内存和 pgvector 算出不同的 sha，增量同步就会永远「有变更」。"""
+    embedder = HashingEmbedder(dim=DIM)
+    table = "chunks_test_prune"
+    items = [(chunk, embedder.embed(f"{chunk.title}。{chunk.text}")) for chunk in chunks]
+    memory = MemoryVectorStore()
+    memory.add_many(items)
+    pg = PgVectorStore(DSN, dim=DIM, table=table)
+    try:
+        pg.add_many(items)
+        assert pg.content_shas() == memory.content_shas()
+        assert pg.content_shas()["kb-1"] == content_sha("免赔额", "百万医疗免赔额一万元")
+        # prune 只留两条：语料删条目后库里不许留脏行
+        assert pg.prune(["kb-1", "kb-2"]) == 1
+        assert len(pg) == 2
+        assert memory.prune(["kb-1", "kb-2"]) == 1
+    finally:
+        with pg._conn.cursor() as cursor:
+            cursor.execute(f"DROP TABLE IF EXISTS {table}")
+        pg.close()

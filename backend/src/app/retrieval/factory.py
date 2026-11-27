@@ -53,5 +53,8 @@ def build_vector_store(config: RetrievalConfig, *, dim: int) -> VectorStore:
     if config.backend == "pgvector":
         if not config.dsn:
             raise ConfigurationError("retrieval.backend=pgvector 时必须配 retrieval.dsn")
-        return PgVectorStore(config.dsn, dim=dim, table=config.table)
+        # 只读部署跳过建表语句：库由 scripts/build_index.py 负责，启动只连不建
+        return PgVectorStore(
+            config.dsn, dim=dim, table=config.table, prepare=config.indexing == "sync"
+        )
     raise ConfigurationError(f"不支持的检索后端：{config.backend}")

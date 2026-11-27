@@ -47,6 +47,7 @@ def create_app(settings: AppConfig | None = None) -> FastAPI:
             embedder,
             min_score=settings.retrieval.min_score,
             vector_store=vector_store,
+            indexing=settings.retrieval.indexing,
         )
         # 工具没登记，模型点名也调不到
         tools = boot.tools
@@ -73,6 +74,9 @@ def create_app(settings: AppConfig | None = None) -> FastAPI:
             risk_enabled=settings.risk.enabled,
             contacts=boot.store.contact_count(),
             chunks=boot.retriever.size,
+            # 「这次启动算了几条向量」必须在日志里可见：否则又退回「每次都全量」而无人察觉
+            index_mode=settings.retrieval.indexing,
+            index_embedded=boot.retriever.last_stats.embedded if boot.retriever.last_stats else 0,
             tools=tools,
         )
         try:

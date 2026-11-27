@@ -9,10 +9,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.core.errors import ValidationError
 from app.domains.registry import DomainPack
 from app.retrieval.embedder import Embedder
-from app.retrieval.retriever import Retriever, load_chunks
+from app.retrieval.retriever import IndexingMode, Retriever, load_corpus
 from app.retrieval.store import VectorStore
 from app.store.sqlite_store import CustomerStore
 from app.tools.base import Tool
@@ -43,18 +42,26 @@ def open_store(store_path: str | Path, seed_dir: str | Path) -> CustomerStore:
 
 
 def build_retriever(
-    corpus_dir: str | Path, embedder: Embedder | None = None, store: VectorStore | None = None
+    corpus_dir: str | Path,
+    embedder: Embedder | None = None,
+    store: VectorStore | None = None,
+    *,
+    indexing: IndexingMode = "sync",
+    rebuild: bool = False,
 ) -> Retriever:
-    """把 ``corpus/*.yaml`` 全部灌进索引。语料按行业拆文件即可。"""
-    directory = Path(corpus_dir)
-    files = sorted(directory.glob("*.yaml"))
-    if not files:
-        raise ValidationError(f"语料目录为空：{directory.name}", details={"path": str(directory)})
+    """把语料装进检索器。
 
+    ``indexing="sync"``：启动时只补新增/变更的条目（没变化就是 0 次 embedding）；
+    ``indexing="readonly"``：启动不写库，只对账——库与语料不一致就失败，把「谁负责建库」
+    这件事在启动期就说清楚。
+    """
+    chunks = load_corpus(corpus_dir)
     # 不传 embedder 就用哈希版：CI 里不许联网，测试必须能在无密钥环境跑绿
     retriever = Retriever(embedder, store)
-    for file in files:
-        retriever.index(load_chunks(file))
+    if indexing == "readonly":
+        retriever.audit(chunks)
+    else:
+        retriever.sync(chunks, rebuild=rebuild)
     return retriever
 
 
@@ -126,9 +133,10 @@ def bootstrap_domain(
     *,
     min_score: float | None = None,
     vector_store: VectorStore | None = None,
+    indexing: IndexingMode = "sync",
 ) -> Bootstrap:
     store = open_store(store_path, pack.root / "seed")
-    retriever = build_retriever(pack.root / "corpus", embedder, vector_store)
+    retriever = build_retriever(pack.root / "corpus", embedder, vector_store, indexing=indexing)
     tools = register_domain_tools(pack, store, retriever, min_score=min_score)
     effective = min_score_from(pack, min_score)
     return Bootstrap(store=store, retriever=retriever, tools=tools, min_score=effective)
