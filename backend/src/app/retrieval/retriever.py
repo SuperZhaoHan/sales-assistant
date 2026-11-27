@@ -13,7 +13,7 @@ import yaml
 
 from app.core.errors import ValidationError
 from app.retrieval.embedder import Embedder, HashingEmbedder
-from app.retrieval.store import Chunk, Hit, MemoryVectorStore
+from app.retrieval.store import Chunk, Hit, MemoryVectorStore, VectorStore
 
 
 def load_chunks(path: str | Path) -> tuple[Chunk, ...]:
@@ -54,9 +54,10 @@ def load_chunks(path: str | Path) -> tuple[Chunk, ...]:
 class Retriever:
     """检索入口。对外只有一个 :meth:`search`，工具层不关心里面是内存还是 pgvector。"""
 
-    def __init__(self, embedder: Embedder | None = None) -> None:
+    def __init__(self, embedder: Embedder | None = None, store: VectorStore | None = None) -> None:
         self._embedder = embedder or HashingEmbedder()
-        self._store = MemoryVectorStore()
+        # 默认内存表；真库由调用方注入（PgVectorStore 与它实现同一个 Protocol）
+        self._store: VectorStore = store if store is not None else MemoryVectorStore()
 
     @property
     def size(self) -> int:

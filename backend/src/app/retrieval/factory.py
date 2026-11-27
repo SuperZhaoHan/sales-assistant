@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from app.core.config import EmbeddingConfig
+from app.core.config import EmbeddingConfig, RetrievalConfig
 from app.core.errors import ConfigurationError
 from app.retrieval.embedder import Embedder, HashingEmbedder, OpenAICompatEmbedder
+from app.retrieval.store import MemoryVectorStore, PgVectorStore, VectorStore
 from app.security.secrets.base import SecretValue
 from app.security.secrets.resolver import SecretResolver
 
@@ -39,3 +40,18 @@ async def build_embedder_from_settings(
     if config.provider == "openai_compat" and config.api_key_ref:
         key = await secrets.resolve(config.api_key_ref)
     return build_embedder(config, key)
+
+
+def build_vector_store(config: RetrievalConfig, *, dim: int) -> VectorStore:
+    """存储后端：memory 直接给内存表，pgvector 才连库。
+
+    ``dim`` 从 embedding 配置来：表和向量的维度必须同一个来源，
+    否则「配置 1024、模型返 1536」这种错会在入库时才炸（那时数据已经脏了）。
+    """
+    if config.backend == "memory":
+        return MemoryVectorStore()
+    if config.backend == "pgvector":
+        if not config.dsn:
+            raise ConfigurationError("retrieval.backend=pgvector 时必须配 retrieval.dsn")
+        return PgVectorStore(config.dsn, dim=dim, table=config.table)
+    raise ConfigurationError(f"不支持的检索后端：{config.backend}")

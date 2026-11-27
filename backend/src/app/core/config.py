@@ -163,6 +163,18 @@ class RetrievalConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     min_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    # 存储后端：memory（进程内全表扫，CI/单机默认）/ pgvector（真库，带 HNSW 索引）
+    backend: Literal["memory", "pgvector"] = "memory"
+    # pgvector 连接串；backend=pgvector 时必填
+    dsn: str | None = None
+    # 表名走白名单式校验：表名会拼进 SQL，不能让配置随手写一句进来的东西
+    table: str = Field(default="chunks", pattern=r"^[a-z][a-z0-9_]{0,62}$")
+
+    @model_validator(mode="after")
+    def validate_backend(self) -> Self:
+        if self.backend == "pgvector" and not self.dsn:
+            raise ValueError("retrieval.backend=pgvector 时必须配 retrieval.dsn")
+        return self
 
 
 class RedisConfig(BaseModel):

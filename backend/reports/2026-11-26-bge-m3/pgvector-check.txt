@@ -1,0 +1,8 @@
+embedder OpenAICompatEmbedder(BAAI/bge-m3)，语料 30 条
+建索引：memory 2030.8 ms / pgvector 867.5 ms
+hit@3 ：memory 17/17 / pgvector 17/17
+top1 分数最大偏差 7.32e-04
+单次检索：memory 204359 µs / pgvector 201768 µs（各 50 次平均）
+
+✓ top1 chunk_id 全部一致
+✓ hit@3 数字一致

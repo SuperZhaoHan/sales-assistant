@@ -13,6 +13,7 @@ from app.core.errors import ValidationError
 from app.domains.registry import DomainPack
 from app.retrieval.embedder import Embedder
 from app.retrieval.retriever import Retriever, load_chunks
+from app.retrieval.store import VectorStore
 from app.store.sqlite_store import CustomerStore
 from app.tools.base import Tool
 from app.tools.customer_profile import build_customer_profile_tool
@@ -41,7 +42,9 @@ def open_store(store_path: str | Path, seed_dir: str | Path) -> CustomerStore:
     return store
 
 
-def build_retriever(corpus_dir: str | Path, embedder: Embedder | None = None) -> Retriever:
+def build_retriever(
+    corpus_dir: str | Path, embedder: Embedder | None = None, store: VectorStore | None = None
+) -> Retriever:
     """把 ``corpus/*.yaml`` 全部灌进索引。语料按行业拆文件即可。"""
     directory = Path(corpus_dir)
     files = sorted(directory.glob("*.yaml"))
@@ -49,7 +52,7 @@ def build_retriever(corpus_dir: str | Path, embedder: Embedder | None = None) ->
         raise ValidationError(f"语料目录为空：{directory.name}", details={"path": str(directory)})
 
     # 不传 embedder 就用哈希版：CI 里不许联网，测试必须能在无密钥环境跑绿
-    retriever = Retriever(embedder)
+    retriever = Retriever(embedder, store)
     for file in files:
         retriever.index(load_chunks(file))
     return retriever
@@ -122,9 +125,10 @@ def bootstrap_domain(
     embedder: Embedder | None = None,
     *,
     min_score: float | None = None,
+    vector_store: VectorStore | None = None,
 ) -> Bootstrap:
     store = open_store(store_path, pack.root / "seed")
-    retriever = build_retriever(pack.root / "corpus", embedder)
+    retriever = build_retriever(pack.root / "corpus", embedder, vector_store)
     tools = register_domain_tools(pack, store, retriever, min_score=min_score)
     effective = min_score_from(pack, min_score)
     return Bootstrap(store=store, retriever=retriever, tools=tools, min_score=effective)

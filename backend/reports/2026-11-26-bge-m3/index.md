@@ -51,3 +51,51 @@
 - 1.10b：换 pgvector 后端（`sales-pg` 容器，端口 5482），验证"存储换掉后数字不变"。
 - 造 8–10 道"半相关"擦边题，重扫阈值——这才是真实阈值的考验。
 - 查询向量缓存（同问题命中率）或本地 embedding，压掉 248 ms。
+
+---
+
+# 1.10b：pgvector 后端（同日）
+
+容器：`sales-pg`（pgvector/pgvector:pg16，PG 16.16，端口 5482），表 `chunks_check`。
+驱动：`psycopg 3.3.9`（`pip install "psycopg[binary]"`）。
+
+复现：
+
+```bash
+.venv/bin/python scripts/verify_pgvector.py --embedder real          # 两条后端逐题对比
+PG_TEST_DSN=postgresql://postgres:postgres@localhost:5482/postgres \
+    .venv/bin/python -m pytest tests/integration/test_pgvector_store.py -q
+```
+
+## 一致性（判据：换存储不能换语义）
+
+| 检查 | 结果 |
+| --- | --- |
+| top1 chunk_id 逐题对比（17 题） | **17/17 一致** |
+| hit@3 | memory **17/17** / pgvector **17/17** |
+| top1 分数最大偏差 | **1.6e-3** |
+
+分数不是 0 差：pgvector 的 `vector` 列是 `float4`（单精度），Python 侧是 `float64`，1.6e-3 是精度截断的必然结果，不是算法差异。**注意**：阈值 0.64 与两侧 0.63 / 0.65 的间距是 0.01，1.6e-3 的误差仍在安全范围内；但若哪天阈值定在两个集群只差 1e-3，就会出现"同一句话换存储后答/不答翻转"。
+
+## 延迟（要拆开看，别把 HTTP 算成数据库）
+
+| 口径 | memory | pgvector |
+| --- | --- | --- |
+| 端到端单次检索（含远程 embedding） | 198 ms | 207 ms |
+| 纯存储（向量已算好，hash 256 维，200 次中位） | 281 µs | 314 µs |
+| 纯存储最慢一次 | 399 µs | 4110 µs |
+
+三个结论：
+
+1. **端到端的 200 ms 全是 bge-m3 的 HTTP，不是数据库。** 两者差 8 ms，就是本地 socket + SQL 解析的开销。
+2. **30 条语料下两种后端同量级**（281 vs 314 µs）。这个规模内存扫本来就快，pgvector 赢不了。
+3. **pgvector 的价值在规模，不在当下**：内存是全表 O(N)，HNSW 是近似 O(log N)；再加上持久化、租户过滤下推到 SQL、多进程共享一份索引。
+
+## 集成用例（3 条，CI 里自动 skip）
+
+- `test_same_top1_and_score`：同查询两条后端 top1 与分数必须一致；
+- `test_tenant_filter_before_scoring`：别家租户的块不能进候选池（过滤在 SQL 里做）；
+- `test_upsert_is_idempotent`：重复灌语料不翻倍（`ON CONFLICT DO UPDATE`）。
+
+CI 不装 psycopg、不起容器，所以这三条在流水线上是 skip；本地有容器时用 `PG_TEST_DSN` 打开。
+

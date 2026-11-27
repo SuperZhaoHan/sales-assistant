@@ -72,6 +72,10 @@ retrieval:
   # 空 = 用 domain pack 里的行业阈值（哈希基线 0.35）。
   # 换 embedding 后必须重扫并在 .env 里覆盖：APP__RETRIEVAL__MIN_SCORE=0.64
   min_score: null
+  # 存储后端：memory（进程内全表扫，CI 默认）/ pgvector（真库）
+  backend: memory
+  table: chunks
+  dsn: null
 
 risk:
   enabled: true

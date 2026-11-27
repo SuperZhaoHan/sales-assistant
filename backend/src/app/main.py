@@ -19,7 +19,7 @@ from app.llm.factory import build_llm_gateway
 from app.observability.health import router as health_router
 from app.observability.metrics import router as metrics_router
 from app.observability.tracing import setup_tracing
-from app.retrieval.factory import build_embedder_from_settings
+from app.retrieval.factory import build_embedder_from_settings, build_vector_store
 from app.risk.engine import build_risk_engine
 from app.security.secrets.factory import build_secret_resolver, validate_required_secrets
 from app.tools.bootstrap import bootstrap_domain
@@ -39,8 +39,14 @@ def create_app(settings: AppConfig | None = None) -> FastAPI:
         await validate_required_secrets(settings, secrets)
         # 密钥校验通过之后才碰外部资源：配错了不该先建出一个空库
         embedder = await build_embedder_from_settings(settings.embedding, secrets)
+        # 存储后端在此决定：memory（默认）还是 pgvector（真库）
+        vector_store = build_vector_store(settings.retrieval, dim=settings.embedding.dim)
         boot = bootstrap_domain(
-            domain, settings.app.store_path, embedder, min_score=settings.retrieval.min_score
+            domain,
+            settings.app.store_path,
+            embedder,
+            min_score=settings.retrieval.min_score,
+            vector_store=vector_store,
         )
         # 工具没登记，模型点名也调不到
         tools = boot.tools

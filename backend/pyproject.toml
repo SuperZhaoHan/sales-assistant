@@ -24,6 +24,7 @@ dependencies = [
 
 [project.optional-dependencies]
 anthropic = ["anthropic>=2.0.0"]
+pg = ["psycopg[binary]>=3.2"]
 redis = ["redis>=5.2.0"]
 vault = ["hvac>=2.3.0"]
 aws = ["boto3>=1.35.0"]
