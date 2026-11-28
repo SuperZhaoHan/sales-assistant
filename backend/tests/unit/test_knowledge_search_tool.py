@@ -61,11 +61,11 @@ async def test_top_k_overflow_rejected(tool) -> None:
     assert "top_k" in str(caught.value)
 
 
-def test_both_tools_registered(retriever: Retriever) -> None:
+def test_all_domain_tools_registered(retriever: Retriever) -> None:
     pack = load_domain("insurance")
     from app.tools.bootstrap import open_store, register_domain_tools
 
     store = open_store(":memory:", pack.root / "seed")
     names = register_domain_tools(pack, store, retriever)
-    assert names == ("customer_profile", "knowledge_search")
-    assert len(list_tools()) == 2
+    assert names == ("customer_profile", "knowledge_search", "create_task")
+    assert len(list_tools()) == 3

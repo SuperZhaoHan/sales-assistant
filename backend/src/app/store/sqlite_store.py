@@ -9,10 +9,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 import threading
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
@@ -37,8 +39,18 @@ CREATE TABLE IF NOT EXISTS assets (
     expires_at TEXT,
     premium_cents INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS tasks (
+    id TEXT PRIMARY KEY,
+    customer_name TEXT NOT NULL,
+    title TEXT NOT NULL,
+    due_at TEXT,
+    status TEXT NOT NULL DEFAULT 'open',
+    dedupe_key TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_contacts_name ON contacts(name);
 CREATE INDEX IF NOT EXISTS idx_assets_contact ON assets(contact_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_customer ON tasks(customer_name);
 """
 
 # 白名单：表名/列名不参与 SQL 拼接，静态扫描（bandit B608）也不会报
@@ -74,6 +86,19 @@ class Asset:
     status: str
     expires_at: str
     premium_cents: int
+
+
+@dataclass(frozen=True, slots=True)
+class Task:
+    """一条跟进任务。``id`` 由 ``dedupe_key`` 派生，所以重放算出来也是同一个 id。"""
+
+    id: str
+    customer_name: str
+    title: str
+    due_at: str | None
+    status: str
+    dedupe_key: str
+    created_at: str
 
 
 class CustomerStore:
@@ -205,6 +230,63 @@ class CustomerStore:
     def contact_count(self) -> int:
         return int(self.conn.execute("SELECT COUNT(*) FROM contacts").fetchone()[0])
 
+    # ------------------------------------------------------------------ 跟进任务
+
+    def add_task(
+        self,
+        *,
+        customer_name: str,
+        title: str,
+        dedupe_key: str,
+        due_at: str | None = None,
+        created_at: str | None = None,
+    ) -> Task:
+        """幂等建任务：同一个 ``dedupe_key`` 无论写几次都只有一行、返回同一个 id。
+
+        两层保证：id 由 key 派生（``tk-`` + sha256 前 12 位），插入用 ``INSERT OR IGNORE``，
+        ``dedupe_key`` 上还有 UNIQUE 约束。少任何一层，并发重放都可能出两行。
+        """
+
+        if not dedupe_key.strip():
+            raise ValidationError("dedupe_key 不能为空", details={"field": "dedupe_key"})
+        if not customer_name.strip() or not title.strip():
+            raise ValidationError(
+                "客户名与任务标题都不能为空",
+                details={"field": "customer_name/title"},
+            )
+        task_id = "tk-" + hashlib.sha256(dedupe_key.encode("utf-8")).hexdigest()[:12]
+        created = created_at or datetime.now(UTC).isoformat(timespec="seconds")
+        with self._lock:
+            self.conn.execute(
+                "INSERT OR IGNORE INTO tasks "
+                "(id, customer_name, title, due_at, status, dedupe_key, created_at) "
+                "VALUES (?, ?, ?, ?, 'open', ?, ?)",
+                (task_id, customer_name, title, due_at, dedupe_key, created),
+            )
+            self.conn.commit()
+        task = self.get_task(task_id)
+        if task is None:
+            raise ValidationError("任务写入后查不到", details={"task_id": task_id})
+        return task
+
+    def get_task(self, task_id: str) -> Task | None:
+        row = self.conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        return _to_task(row) if row is not None else None
+
+    def list_tasks(self, customer_name: str | None = None) -> tuple[Task, ...]:
+        if customer_name is None:
+            rows = self.conn.execute("SELECT * FROM tasks ORDER BY created_at").fetchall()
+        else:
+            rows = self.conn.execute(
+                "SELECT * FROM tasks WHERE customer_name = ? ORDER BY created_at",
+                (customer_name,),
+            ).fetchall()
+        return tuple(_to_task(row) for row in rows)
+
+    def count_tasks(self) -> int:
+        row = self.conn.execute("SELECT count(*) FROM tasks").fetchone()
+        return int(row[0]) if row else 0
+
     def raw_rows(self, table: str) -> Iterable[sqlite3.Row]:
         """原样返回表里的行——只给测试用。"""
         # [TUTOR-WHY] 生产路径不许读它：绕过脱敏只需要一次「顺手查一下原始表」。
@@ -236,4 +318,16 @@ def _to_asset(row: sqlite3.Row) -> Asset:
         status=row["status"],
         expires_at=row["expires_at"] or "",
         premium_cents=int(row["premium_cents"]),
+    )
+
+
+def _to_task(row: sqlite3.Row) -> Task:
+    return Task(
+        id=str(row["id"]),
+        customer_name=str(row["customer_name"]),
+        title=str(row["title"]),
+        due_at=str(row["due_at"]) if row["due_at"] is not None else None,
+        status=str(row["status"]),
+        dedupe_key=str(row["dedupe_key"]),
+        created_at=str(row["created_at"]),
     )

@@ -21,6 +21,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Annotated, Any, TypedDict
 
+from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, interrupt
@@ -135,12 +136,16 @@ def build_graph(deps: GraphDeps, *, checkpointer: BaseCheckpointSaver | None = N
             "trace": ["await_confirm"],
         }
 
-    async def commit_task_node(state: GraphState) -> dict[str, Any]:
+    async def commit_task_node(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
         # 「落实决定」：confirmed 才写，拒绝也走这个节点，好处是「终态只有一处写」。
         if not state.get("confirmed", False):
             return {"stage": TaskStage.ABORTED.value, "trace": ["commit_task"]}
+        # [TUTOR-WHY] 幂等键要用 thread_id 参与计算，所以节点必须读 config；
+        # [TUTOR-WHY] thread_id 不在 state 里，它是「会话的身份」，由调用方持有。
+        thread_id = str((config.get("configurable") or {}).get("thread_id", ""))
         task_id = await deps.commit_task(
             {
+                "thread_id": thread_id,
                 "customer_name": state.get("customer_name", ""),
                 "title": state["task_title"],
                 "advice": state["advice"],
