@@ -78,6 +78,11 @@ async def test_expired_confirm_is_rejected_and_audited(store: CustomerStore, gra
     assert action["status"] == "expired"
     assert "age=" in str(action["detail"])
 
+    # 超时要给线程收尾：interrupt 必须清空，否则会永远挂在库里、列表页一直「待确认」
+    snapshot = await graph.aget_state(thread_config("t-24-late"))
+    assert snapshot.interrupts == ()
+    assert snapshot.values["stage"] == "aborted", "超时按拒绝走，终态是 aborted"
+
 
 async def test_exactly_at_ttl_is_still_allowed(store: CustomerStore, graph) -> None:
     """边界：恰好等于 TTL 不算超时（判定用 >，不是 >=）。"""

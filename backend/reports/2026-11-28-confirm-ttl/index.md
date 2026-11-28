@@ -14,7 +14,7 @@
 | 文件 | 改动 |
 | --- | --- |
 | `src/app/core/config.py` + `config/base.yaml` | 新增 `agent.confirm_ttl_seconds=300`、`agent.checkpoint_dsn`（空 = 内存 saver） |
-| `src/app/agent/confirm.py` | `confirm_task`：先判有无待确认 → 再判 TTL → 最后才 `resume`；超时写 `actions.status=expired` 并返回 409 |
+| `src/app/agent/confirm.py` | `confirm_task`：先判有无待确认 → 再判 TTL → 最后才 `resume`；超时写 `actions.status=expired`、**照样 `resume(False)` 让线程走到 aborted 终态**（不收尾会永远挂着）、返回 409 |
 | `src/app/store/sqlite_store.py` | 新增 `actions` 表（审计留痕）+ `record_action/list_actions/count_actions` |
 | `src/app/agent/runtime.py` | 把图 + checkpointer + 业务库装成 `AgentRuntime`；`checkpoint_dsn` 空时退回内存 saver 并在启动日志告警 |
 | `src/app/api/v1/tasks.py` | `POST /v1/tasks/confirm`：服务层结论 → HTTP（200 / 409 `ConflictError`） |
@@ -27,7 +27,7 @@
 | 指标 | 结果 |
 | --- | --- |
 | TTL 内确认 | **2.6 ms**，`status=confirmed`，`tasks` +1 |
-| 超时确认（默认拒绝） | **0.7 ms**，`status=expired`，`code=CONFIRM_EXPIRED`，该线程 **0 行** |
+| 超时确认（默认拒绝） | **1.5 ms**（含 resume 收尾），`status=expired`，`code=CONFIRM_EXPIRED`，该线程 **0 行**，interrupt 清空、终态 `aborted` |
 | 审计 | 两条（一条 confirmed、一条 expired） |
 | 单测 | 6 条 **0.06 s**；接口 2 条 **0.06 s** |
 | 全量（真 PG） | **259 passed / 1 skipped 1.93 s**；无库 **251 / 9** |
@@ -37,6 +37,7 @@
 1. **把 TTL 判定挪到 `ainvoke` 之后** → `test_expired_confirm_is_rejected_and_audited` 红：副作用（1 行任务）已经发生，409 只是事后通知。
 2. **`>` 改成 `>=`** → `test_exactly_at_ttl_is_still_allowed` 红：恰好 300 秒被误判超时。
 3. **删掉 `record_action(expired)`** → 审计断言红：拒绝没有留痕，事后无法解释「为什么没建任务」。
+3b. **超时分支只 `return 409`、不 `resume(False)`** → 收尾断言红：`snapshot.interrupts` 非空、`stage` 仍是 `awaiting_confirm`，线程变成永久僵尸（列表页一直「待确认」）。
 4. **重复确认**：第二次 confirm 必须 `missing`（没有待确认项），`tasks` 仍 1 —— 这条同时是 2.5 的引子。
 
 ## 开发中踩到的坑（值得记住）
@@ -49,6 +50,7 @@
 
 - **没有「发起确认」接口**：待确认线程目前只能在图/脚本里产生；真实链路是「对话 → 草稿 → 等人点确认」，前端与起草接口还没接。
 - **默认内存 saver**：`agent.checkpoint_dsn` 为空时重启即丢线程；真库要显式配。
+- **终态收尾只做到「图走到 aborted」**：`agent_threads` 投影与 checkpoint 归档（到点删除）没做，过期线程仍占存储、列表页需要靠 rebuild/重建才不被误认。
 - **并发两次 confirm 没有分布式锁**：第二次会落到 `missing`（checkpointer 串行），但两个进程同时恢复同一线程的行为没测过。
 - **`actions` 只是审计表**：幂等结果复用、重放返回原结果在 2.5。
 

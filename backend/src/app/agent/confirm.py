@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal, Protocol
 
 from app.agent.graph import resume, thread_config
+from app.core.errors import InternalError
 from app.store.sqlite_store import CustomerStore
 
 ConfirmStatus = Literal["confirmed", "rejected", "expired", "missing"]
@@ -100,6 +101,16 @@ async def confirm_task(
             status="expired",
             detail=f"age={age:.1f}s > ttl={ttl_seconds}s",
         )
+        # [TUTOR-WHY] 只返回 409 不给线程收尾，interrupt 会永远挂在 checkpointer 里：
+        # [TUTOR-WHY] 列表页一直显示「待确认」、人反复点、对账数字虚高。
+        # 所以照样 resume(False)：走「拒绝」分支到终态，interrupt 自然清空，且不会写任务。
+        final = await graph.ainvoke(resume(False), config)
+        if final.get("stage") == "committed":
+            # 防御：超时分支绝不能写出任务；真写出来说明 resume(False) 语义被改坏了
+            raise InternalError(
+                "超时拒绝分支产生了任务，resume(False) 语义已损坏",
+                details={"thread_id": thread_id},
+            )
         return ConfirmOutcome(
             status="expired",
             http_status=HTTP_CONFLICT,
