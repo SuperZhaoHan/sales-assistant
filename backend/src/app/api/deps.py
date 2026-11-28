@@ -4,6 +4,7 @@ from typing import cast
 
 from fastapi import Request
 
+from app.agent.runtime import AgentRuntime
 from app.core.config import AppConfig
 from app.core.errors import ConfigurationError
 from app.domains.registry import DomainPack
@@ -50,3 +51,10 @@ def get_domain(request: Request) -> DomainPack:
     if domain is None:
         raise ConfigurationError("domain pack is not initialized")
     return cast(DomainPack, domain)
+
+
+def get_agent_runtime(request: Request) -> AgentRuntime:
+    runtime = getattr(request.app.state, "agent", None)
+    if runtime is None:
+        raise ConfigurationError("agent runtime is not initialized")
+    return cast(AgentRuntime, runtime)

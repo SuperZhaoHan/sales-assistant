@@ -81,6 +81,12 @@ retrieval:
   #   readonly = 启动不写库，只对账；库与语料不一致直接启动失败（库由 build_index.py 负责）
   indexing: sync
 
+agent:
+  # 确认窗口（秒）：超过就默认拒绝，避免「走开一小时回来顺手点了确认」
+  confirm_ttl_seconds: 300
+  # checkpointer 的 PG 连接串；空 = 内存 saver（只适合本地/CI）
+  checkpoint_dsn: null
+
 risk:
   enabled: true
   fail_closed: true

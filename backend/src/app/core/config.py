@@ -180,6 +180,20 @@ class RetrievalConfig(BaseModel):
         return self
 
 
+class AgentConfig(BaseModel):
+    """状态图的运行时参数。
+
+    ``checkpoint_dsn`` 为空 → 用内存 saver（只适合本地/CI：进程一重启线程就没了）；
+    真库就必须配，否则「跨重启恢复」这条承诺在运行时根本不成立。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # 确认窗口：超过就默认拒绝（人可能走开了，放着不动比误确认安全）
+    confirm_ttl_seconds: int = Field(default=300, ge=1)
+    checkpoint_dsn: str | None = None
+
+
 class RedisConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -207,6 +221,7 @@ class AppConfig(BaseModel):
     risk: RiskConfig = Field(default_factory=RiskConfig)
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
     retrieval: RetrievalConfig = Field(default_factory=RetrievalConfig)
+    agent: AgentConfig = Field(default_factory=AgentConfig)
     redis: RedisConfig = Field(default_factory=RedisConfig)
     observability: ObservabilityConfig = Field(default_factory=ObservabilityConfig)
 

@@ -1,0 +1,127 @@
+"""确认动作的服务层：判断「还能不能确认」，再决定写不写。
+
+为什么 TTL 判定要在服务层、不在图里：
+- 图只负责流程，不知道「人可能走开」这件事；
+- 超时是产品规则（默认拒绝），改规则不该动图；
+- 判定必须发生在恢复**之前**——一旦恢复，节点就开始跑，再判就晚了。
+"""
+
+from __future__ import annotations
+
+import time
+from collections.abc import Mapping
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any, Literal, Protocol
+
+from app.agent.graph import resume, thread_config
+from app.store.sqlite_store import CustomerStore
+
+ConfirmStatus = Literal["confirmed", "rejected", "expired", "missing"]
+
+HTTP_OK = 200
+HTTP_CONFLICT = 409
+
+
+class GraphLike(Protocol):
+    async def aget_state(self, config: Mapping[str, Any]) -> Any: ...
+
+    async def ainvoke(self, input: Any, config: Mapping[str, Any]) -> Any: ...
+
+
+@dataclass(frozen=True, slots=True)
+class ConfirmOutcome:
+    """一次确认动作的结果。``http_status`` 让接口层直接照着映射，不用自己再判一遍。"""
+
+    status: ConfirmStatus
+    http_status: int
+    code: str
+    task_id: str | None = None
+    age_seconds: float | None = None
+
+
+def _paused_at(created_at: str | None) -> float | None:
+    """检查点的 ``created_at`` 就是「线程停下的时刻」，TTL 从它开始算。
+
+    为什么不用 state 里的自定义字段：``interrupt`` 暂停时节点还没返回，
+    写在节点里的时间戳要等恢复才有值——拿它判 TTL，永远是「刚刚暂停」。
+    """
+
+    if not created_at:
+        return None
+    try:
+        return datetime.fromisoformat(created_at).astimezone(UTC).timestamp()
+    except ValueError:
+        return None
+
+
+async def confirm_task(
+    graph: GraphLike,
+    store: CustomerStore,
+    thread_id: str,
+    approved: bool,
+    *,
+    ttl_seconds: int,
+    now: float | None = None,
+) -> ConfirmOutcome:
+    """确认/拒绝一次待确认动作；超时则默认拒绝并留审计。
+
+    顺序是刻意的：**先判有没有待确认 → 再判超时 → 最后才恢复**。
+    任何一步放在恢复之后，都等于「先跑起来再说」，超时就失去了意义。
+    """
+
+    config = thread_config(thread_id)
+    snapshot = await graph.aget_state(config)
+
+    # 没有待确认的 interrupt：要么线程不存在，要么已经处理过了
+    if not snapshot.interrupts:
+        return ConfirmOutcome(
+            status="missing",
+            http_status=HTTP_CONFLICT,
+            code="NO_PENDING_CONFIRM",
+        )
+
+    requested_at = _paused_at(snapshot.created_at)
+    if requested_at is None:
+        # 算不出「什么时候停的」就不敢确认：宁可让人重新发起
+        return ConfirmOutcome(
+            status="missing",
+            http_status=HTTP_CONFLICT,
+            code="CONFIRM_STATE_UNKNOWN",
+        )
+    current = time.time() if now is None else float(now)
+    age = current - requested_at
+
+    if age > ttl_seconds:
+        # 超时的处置是「拒绝」，不是「等等再说」：人可能早就走了
+        store.record_action(
+            thread_id=thread_id,
+            kind="confirm_task",
+            status="expired",
+            detail=f"age={age:.1f}s > ttl={ttl_seconds}s",
+        )
+        return ConfirmOutcome(
+            status="expired",
+            http_status=HTTP_CONFLICT,
+            code="CONFIRM_EXPIRED",
+            age_seconds=age,
+        )
+
+    final = await graph.ainvoke(resume(approved), config)
+    if final.get("stage") == "committed":
+        store.record_action(thread_id=thread_id, kind="confirm_task", status="confirmed")
+        return ConfirmOutcome(
+            status="confirmed",
+            http_status=HTTP_OK,
+            code="CONFIRMED",
+            task_id=final.get("task_id"),
+            age_seconds=age,
+        )
+
+    store.record_action(thread_id=thread_id, kind="confirm_task", status="rejected")
+    return ConfirmOutcome(
+        status="rejected",
+        http_status=HTTP_OK,
+        code="REJECTED",
+        age_seconds=age,
+    )

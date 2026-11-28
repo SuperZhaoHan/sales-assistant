@@ -7,9 +7,11 @@ import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.agent.runtime import build_agent_runtime
 from app.api.v1.chat import router as chat_router
 from app.api.v1.demo import router as demo_router
 from app.api.v1.summary import router as summary_router
+from app.api.v1.tasks import router as tasks_router
 from app.core.config import AppConfig, load_config
 from app.core.exception_handlers import register_exception_handlers
 from app.core.logging import configure_logging
@@ -53,6 +55,14 @@ def create_app(settings: AppConfig | None = None) -> FastAPI:
         tools = boot.tools
         risk = build_risk_engine(settings)
         llm = await build_llm_gateway(settings, secrets, risk)
+        # 图的运行时：checkpoint 存哪由配置决定，内存 saver 会在启动日志里告警
+        agent = await build_agent_runtime(
+            store=boot.store,
+            retriever=boot.retriever,
+            checkpoint_dsn=settings.agent.checkpoint_dsn,
+            ttl_seconds=settings.agent.confirm_ttl_seconds,
+            min_score=settings.retrieval.min_score or 0.0,
+        )
 
         application.state.domain = domain
         application.state.store = boot.store
@@ -60,6 +70,7 @@ def create_app(settings: AppConfig | None = None) -> FastAPI:
         application.state.secrets = secrets
         application.state.risk = risk
         application.state.llm = llm
+        application.state.agent = agent
         application.state.ready = True
 
         logger.info(
@@ -71,6 +82,7 @@ def create_app(settings: AppConfig | None = None) -> FastAPI:
             provider=settings.llm.provider,
             embedding=f"{settings.embedding.provider}:{settings.embedding.model}",
             model=settings.llm.model,
+            checkpointer=agent.saver_kind,
             risk_enabled=settings.risk.enabled,
             contacts=boot.store.contact_count(),
             chunks=boot.retriever.size,
@@ -83,6 +95,8 @@ def create_app(settings: AppConfig | None = None) -> FastAPI:
             yield
         finally:
             application.state.ready = False
+            application.state.agent = None
+            await agent.aclose()
             boot.store.close()
             await llm.aclose()
             await risk.aclose()
@@ -119,6 +133,7 @@ def create_app(settings: AppConfig | None = None) -> FastAPI:
     app.include_router(health_router)
     app.include_router(chat_router, prefix="/v1")
     app.include_router(summary_router, prefix="/v1")
+    app.include_router(tasks_router, prefix="/v1")
     if settings.env in {"local", "test"}:
         app.include_router(demo_router, prefix="/v1")
 

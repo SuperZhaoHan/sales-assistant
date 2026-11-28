@@ -50,7 +50,16 @@ CREATE TABLE IF NOT EXISTS tasks (
 );
 CREATE INDEX IF NOT EXISTS idx_contacts_name ON contacts(name);
 CREATE INDEX IF NOT EXISTS idx_assets_contact ON assets(contact_id);
+CREATE TABLE IF NOT EXISTS actions (
+    id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    status TEXT NOT NULL,
+    detail TEXT,
+    created_at TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_tasks_customer ON tasks(customer_name);
+CREATE INDEX IF NOT EXISTS idx_actions_thread ON actions(thread_id);
 """
 
 # 白名单：表名/列名不参与 SQL 拼接，静态扫描（bandit B608）也不会报
@@ -285,6 +294,50 @@ class CustomerStore:
 
     def count_tasks(self) -> int:
         row = self.conn.execute("SELECT count(*) FROM tasks").fetchone()
+        return int(row[0]) if row else 0
+
+    # ------------------------------------------------------------------ 确认动作审计
+
+    def record_action(
+        self, *, thread_id: str, kind: str, status: str, detail: str | None = None
+    ) -> str:
+        """记一条「人做过的决定」。这是审计留痕，不是业务事实，所以放得下重复。"""
+
+        action_id = (
+            "act-"
+            + hashlib.sha256(
+                f"{thread_id}|{kind}|{status}|{datetime.now(UTC).isoformat()}".encode()
+            ).hexdigest()[:12]
+        )
+        with self._lock:
+            self.conn.execute(
+                "INSERT INTO actions (id, thread_id, kind, status, detail, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    action_id,
+                    thread_id,
+                    kind,
+                    status,
+                    detail,
+                    datetime.now(UTC).isoformat(timespec="seconds"),
+                ),
+            )
+            self.conn.commit()
+        return action_id
+
+    def list_actions(self, thread_id: str | None = None) -> tuple[dict[str, str | None], ...]:
+        if thread_id is None:
+            rows = self.conn.execute("SELECT * FROM actions ORDER BY created_at").fetchall()
+        else:
+            rows = self.conn.execute(
+                "SELECT * FROM actions WHERE thread_id = ? ORDER BY created_at", (thread_id,)
+            ).fetchall()
+        # [TUTOR-WHY] sqlite3.Row 直接 dict() 才是「列名 → 值」；
+        # 用 `for key in row` 迭代出来是**值**，会拿值当键（改一次就踩这个坑）。
+        return tuple(dict(row) for row in rows)
+
+    def count_actions(self) -> int:
+        row = self.conn.execute("SELECT count(*) FROM actions").fetchone()
         return int(row[0]) if row else 0
 
     def raw_rows(self, table: str) -> Iterable[sqlite3.Row]:
