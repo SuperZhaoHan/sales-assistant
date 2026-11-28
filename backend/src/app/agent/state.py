@@ -26,6 +26,7 @@ class Intent(StrEnum):
     ASK_CUSTOMER = "ask_customer"
     ASK_KNOWLEDGE = "ask_knowledge"
     CREATE_TASK = "create_task"
+    DELETE_TASK = "delete_task"
     CHITCHAT = "chitchat"
 
 

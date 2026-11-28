@@ -17,6 +17,7 @@ from app.store.sqlite_store import CustomerStore
 from app.tools.base import Tool
 from app.tools.create_task import build_create_task_tool
 from app.tools.customer_profile import build_customer_profile_tool
+from app.tools.delete_task import build_delete_task_tool
 from app.tools.knowledge_search import build_knowledge_search_tool
 from app.tools.registry import list_tools, register
 
@@ -104,6 +105,7 @@ def build_toolset(
             **_optional_refusal(pack),
         ),
         build_create_task_tool(store),
+        build_delete_task_tool(store),
     )
 
 

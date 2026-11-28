@@ -67,5 +67,5 @@ def test_all_domain_tools_registered(retriever: Retriever) -> None:
 
     store = open_store(":memory:", pack.root / "seed")
     names = register_domain_tools(pack, store, retriever)
-    assert names == ("customer_profile", "knowledge_search", "create_task")
-    assert len(list_tools()) == 3
+    assert names == ("customer_profile", "knowledge_search", "create_task", "delete_task")
+    assert len(list_tools()) == 4

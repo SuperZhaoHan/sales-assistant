@@ -30,7 +30,8 @@ CASES: tuple[tuple[str, bool, str], ...] = (
     ("给我建个待办，张伟犹豫期还剩两天", True, "写 + 政策词"),
     ("帮我安排一下周六回访刘洋", True, "「安排一下」无客户名"),
     ("帮我查一下张伟的保单，然后建个待办提醒我", True, "查 + 写混合，应按写处理"),
-    ("把张伟那条待办删了", True, "删任务也是写操作，但没有关键词"),
+    ("把张伟那条待办删了", True, "删任务：无任务号，靠 find_task 认目标"),
+    ("张伟这单先关了吧", True, "口头「关单」也是写，但词表没有"),
     ("张伟现在什么阶段", False, "只读：阶段"),
     ("李娜的保单什么时候到期", False, "只读：到期"),
     ("犹豫期退保怎么算", False, "只读：政策"),
@@ -53,10 +54,22 @@ async def main() -> None:
     async def retrieve_knowledge(_query: str) -> str:
         return "犹豫期 15 天内退保按现金价值计算"
 
+    async def find_task(customer_name: str) -> str | None:
+        task = store.find_open_task(customer_name)
+        return task.id if task is not None else None
+
+    async def delete_task(task_id: str) -> None:
+        store.close_task(task_id)
+
+    # 删除类用例需要一个已存在的待办，否则会先撞上「没有可撤销的待办」
+    store.add_task(customer_name="张伟", title="3 天后回访", dedupe_key="det-seed-task")
+
     deps = GraphDeps(
         lookup_customer=lookup_customer,
         retrieve_knowledge=retrieve_knowledge,
         commit_task=make_committer(store),
+        find_task=find_task,
+        delete_task=delete_task,
     )
     graph = build_graph(deps, checkpointer=InMemorySaver())
 

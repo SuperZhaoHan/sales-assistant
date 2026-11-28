@@ -46,7 +46,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     due_at TEXT,
     status TEXT NOT NULL DEFAULT 'open',
     dedupe_key TEXT NOT NULL UNIQUE,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    deleted_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_contacts_name ON contacts(name);
 CREATE INDEX IF NOT EXISTS idx_assets_contact ON assets(contact_id);
@@ -111,6 +112,7 @@ class Task:
     status: str
     dedupe_key: str
     created_at: str
+    deleted_at: str | None = None
 
 
 class CustomerStore:
@@ -128,6 +130,7 @@ class CustomerStore:
         conn.row_factory = sqlite3.Row
         conn.executescript(SCHEMA)
         self._ensure_action_columns(conn)
+        self._ensure_task_columns(conn)
         conn.commit()
         self._conn = conn
         return self
@@ -150,6 +153,14 @@ class CustomerStore:
             conn.execute("ALTER TABLE actions ADD COLUMN idem_key TEXT")
         if "result" not in columns:
             conn.execute("ALTER TABLE actions ADD COLUMN result TEXT")
+
+    @staticmethod
+    def _ensure_task_columns(conn: sqlite3.Connection) -> None:
+        """给老库补 ``tasks.deleted_at``：软删除要看「什么时候删的」，不只是状态变了。"""
+
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(tasks)").fetchall()}
+        if "deleted_at" not in columns:
+            conn.execute("ALTER TABLE tasks ADD COLUMN deleted_at TEXT")
 
     def close(self) -> None:
         if self._conn is not None:
@@ -299,18 +310,72 @@ class CustomerStore:
         row = self.conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
         return _to_task(row) if row is not None else None
 
-    def list_tasks(self, customer_name: str | None = None) -> tuple[Task, ...]:
-        if customer_name is None:
+    def close_task(self, task_id: str) -> Task | None:
+        """逻辑删除：只改状态和时间，不删行。
+
+        为什么不用物理删除：审计要能回答「这条待办是谁什么时候撤的」，报表要能算
+        「本月建了多少、撤了多少」，误删还要能恢复。物理删掉这三件事全做不了。
+
+        返回值语义：删掉了返回该任务；任务不存在、或已经是删除状态，返回 ``None``
+        ——重复调用得到同一个结果，幂等由这条 UPDATE 自己保证（第二次影响 0 行）。
+        """
+
+        now = datetime.now(UTC).isoformat(timespec="seconds")
+        with self._lock:
+            cursor = self.conn.execute(
+                "UPDATE tasks SET status = 'deleted', deleted_at = ? "
+                "WHERE id = ? AND status != 'deleted'",
+                (now, task_id),
+            )
+            self.conn.commit()
+        if cursor.rowcount == 0:
+            return None
+        return self.get_task(task_id)
+
+    def find_open_task(self, customer_name: str) -> Task | None:
+        """该客户最近一条未删除的任务。删除类指令先说"删哪条"，靠的就是它。"""
+
+        row = self.conn.execute(
+            "SELECT * FROM tasks WHERE customer_name = ? AND status != 'deleted' "
+            "ORDER BY created_at DESC LIMIT 1",
+            (customer_name,),
+        ).fetchone()
+        return _to_task(row) if row is not None else None
+
+    def list_tasks(
+        self, customer_name: str | None = None, *, include_deleted: bool = False
+    ) -> tuple[Task, ...]:
+        """默认不返回已删除的任务：列表页给人看的，不该出现撤回的行。"""
+
+        # [TUTOR-WHY] 四条 SQL 分开写死，不拼字符串：拼出来的 WHERE 一旦掺进变量，
+        # 静态扫描（bandit B608）和 code review 都得替你紧张一次；
+        # 这里条件只有「有没有客户名 × 要不要含已删」四种，穷举比拼接更安全也更好读。
+        if customer_name is None and include_deleted:
             rows = self.conn.execute("SELECT * FROM tasks ORDER BY created_at").fetchall()
-        else:
+        elif customer_name is None:
+            rows = self.conn.execute(
+                "SELECT * FROM tasks WHERE status != 'deleted' ORDER BY created_at"
+            ).fetchall()
+        elif include_deleted:
             rows = self.conn.execute(
                 "SELECT * FROM tasks WHERE customer_name = ? ORDER BY created_at",
                 (customer_name,),
             ).fetchall()
+        else:
+            rows = self.conn.execute(
+                "SELECT * FROM tasks WHERE customer_name = ? AND status != 'deleted' "
+                "ORDER BY created_at",
+                (customer_name,),
+            ).fetchall()
         return tuple(_to_task(row) for row in rows)
 
-    def count_tasks(self) -> int:
-        row = self.conn.execute("SELECT count(*) FROM tasks").fetchone()
+    def count_tasks(self, *, include_deleted: bool = False) -> int:
+        if include_deleted:
+            row = self.conn.execute("SELECT count(*) FROM tasks").fetchone()
+        else:
+            row = self.conn.execute(
+                "SELECT count(*) FROM tasks WHERE status != 'deleted'"
+            ).fetchone()
         return int(row[0]) if row else 0
 
     # ------------------------------------------------------------------ 确认动作审计
@@ -441,4 +506,5 @@ def _to_task(row: sqlite3.Row) -> Task:
         status=str(row["status"]),
         dedupe_key=str(row["dedupe_key"]),
         created_at=str(row["created_at"]),
+        deleted_at=str(row["deleted_at"]) if row["deleted_at"] is not None else None,
     )

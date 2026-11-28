@@ -100,10 +100,22 @@ async def build_agent_runtime(
             f"[K{index}] {hit.chunk.title}：{hit.chunk.text}" for index, hit in enumerate(hits, 1)
         )
 
+    async def find_task(customer_name: str) -> str | None:
+        task = await asyncio.to_thread(store.find_open_task, customer_name)
+        return task.id if task is not None else None
+
+    async def delete_task(task_id: str) -> None:
+        # 逻辑删除在存储层；这里只负责"把删除这件事执行掉"，不判断该不该删
+        task = await asyncio.to_thread(store.close_task, task_id)
+        if task is None:
+            logger.info("agent_delete_skipped", task_id=task_id, reason="已删除或不存在")
+
     deps = GraphDeps(
         lookup_customer=lookup_customer,
         retrieve_knowledge=retrieve_knowledge,
         commit_task=make_committer(store),
+        find_task=find_task,
+        delete_task=delete_task,
     )
     return AgentRuntime(
         graph=build_graph(deps, checkpointer=saver),

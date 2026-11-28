@@ -117,7 +117,7 @@ def _write_pack(
 def test_pack_ships_intent_table() -> None:
     pack = load_domain("insurance")
 
-    assert list(pack.intents) == ["create_task", "ask_customer", "ask_knowledge"]
+    assert list(pack.intents) == ["delete_task", "create_task", "ask_customer", "ask_knowledge"]
     assert "建个待办" in pack.intents["create_task"]
     assert "保单" in pack.intents["ask_customer"]
     assert "理赔" in pack.intents["ask_knowledge"]
@@ -136,6 +136,7 @@ def test_unknown_intent_key_fails_at_load(tmp_path: Path) -> None:
         "ask_knowledge",
         "chitchat",
         "create_task",
+        "delete_task",
     ]
 
 

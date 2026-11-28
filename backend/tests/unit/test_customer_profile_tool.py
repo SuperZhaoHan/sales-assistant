@@ -156,9 +156,9 @@ def test_registered_tools_are_known_to_planner(store: CustomerStore) -> None:
     # [TUTOR-JAVA] 装配三件套一次调完，返回全部工具名（含顺序）
     names = register_domain_tools(pack, store, build_retriever(pack.root / "corpus"))
     # [TUTOR-WHY] 断元组而不是集合：顺序也是契约，它决定给模型的工具顺序
-    assert names == ("customer_profile", "knowledge_search", "create_task")
+    assert names == ("customer_profile", "knowledge_search", "create_task", "delete_task")
     # [TUTOR-JAVA] issubset ≈ containsAll：只读两件套必须被 1.x 的假规划器认识
     assert set(FakeLLMPlanner.actions).issubset(set(names))
     # [TUTOR-WHY] create_task 是写工具，1.x 的「查→查→答」循环不该碰它；
     # 它只在 2.x 状态图的确认节点里被调，所以这里只断言它确实登记了
-    assert "create_task" in names
+    assert {"create_task", "delete_task"} <= set(names)

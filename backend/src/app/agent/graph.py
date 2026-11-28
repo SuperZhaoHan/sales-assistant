@@ -28,6 +28,7 @@ from langgraph.types import Command, interrupt
 
 from app.agent.intent import classify_intent
 from app.agent.state import Intent, TaskStage
+from app.core.errors import BusinessRuleError, InternalError
 
 
 # [TUTOR-WHY] trace 用 Annotated + operator.add 声明成「累加字段」：
@@ -47,6 +48,7 @@ class GraphState(TypedDict, total=False):
     knowledge: str
     advice: str
     task_title: str
+    target_task_id: str
     confirmed: bool
     task_id: str
     trace: Annotated[list[str], operator.add]
@@ -63,6 +65,10 @@ class GraphDeps:
     lookup_customer: Callable[[str], Awaitable[str]]
     retrieve_knowledge: Callable[[str], Awaitable[str]]
     commit_task: Callable[[Mapping[str, str]], Awaitable[str]]
+    # [TUTOR-WHY] 删除相关依赖默认 None：没注入就代表这项能力不存在，
+    # 走到删除路径时直接报 InternalError，而不是悄悄什么都不做。
+    find_task: Callable[[str], Awaitable[str | None]] | None = None
+    delete_task: Callable[[str], Awaitable[None]] | None = None
     intents: Mapping[str, tuple[str, ...]] | None = None
 
 
@@ -105,11 +111,27 @@ def build_graph(deps: GraphDeps, *, checkpointer: BaseCheckpointSaver | None = N
         text = await deps.retrieve_knowledge(state["task"])
         return {"knowledge": text, "trace": ["retrieve_knowledge"]}
 
+    async def resolve_target_node(state: GraphState) -> dict[str, Any]:
+        # 删除类指令只说了「把待办删了」，没给任务号——先替用户认出要删哪条。
+        if deps.find_task is None:
+            raise InternalError("删除能力未装配（缺少 find_task 依赖）")
+        name = state.get("customer_name") or ""
+        task_id = await deps.find_task(name)
+        if task_id is None:
+            # 找不到就别往下走：确认框里写不出去"删哪条"，弹给用户也没法点
+            raise BusinessRuleError(
+                "该客户没有可撤销的待办",
+                details={"customer_name": name, "code": "NO_OPEN_TASK"},
+            )
+        return {"target_task_id": task_id, "trace": ["resolve_target"]}
+
     async def draft_advice_node(state: GraphState) -> dict[str, Any]:
         # 2.1 的草稿是模板拼的，故意的：先证明「图能跑通」，2.3 再接模型。
         name = state.get("customer_name") or "该客户"
         if state["intent"] == Intent.CREATE_TASK.value:
             title = f"为{name}确认续保"
+        elif state["intent"] == Intent.DELETE_TASK.value:
+            title = f"撤销{name}的待办 {state.get('target_task_id', '')}"
         else:
             title = f"整理{name}的答复"
         lines = [f"跟进建议（{name}）：", f"- 下一步：{title}"]
@@ -127,8 +149,9 @@ def build_graph(deps: GraphDeps, *, checkpointer: BaseCheckpointSaver | None = N
         # [TUTOR-WHY] interrupt() 会把整个图「冻住」并把载荷交给调用方；恢复时这个节点
         # [TUTOR-WHY] 从头再执行一遍，interrupt 返回调用方传来的值。
         # [TUTOR-WHY] 所以 interrupt 之前的代码必须无副作用——重复执行不能写两次库。
+        action = "撤销任务" if state["intent"] == Intent.DELETE_TASK.value else "创建任务"
         decision = interrupt(
-            {"question": f"确认创建任务「{state['task_title']}」？", "advice": state["advice"]}
+            {"question": f"确认{action}「{state['task_title']}」？", "advice": state["advice"]}
         )
         return {
             "confirmed": bool(decision),
@@ -143,6 +166,16 @@ def build_graph(deps: GraphDeps, *, checkpointer: BaseCheckpointSaver | None = N
         # [TUTOR-WHY] 幂等键要用 thread_id 参与计算，所以节点必须读 config；
         # [TUTOR-WHY] thread_id 不在 state 里，它是「会话的身份」，由调用方持有。
         thread_id = str((config.get("configurable") or {}).get("thread_id", ""))
+        if state["intent"] == Intent.DELETE_TASK.value:
+            if deps.delete_task is None:
+                raise InternalError("删除能力未装配（缺少 delete_task 依赖）")
+            deleted = state["target_task_id"]
+            await deps.delete_task(deleted)
+            return {
+                "task_id": deleted,
+                "stage": TaskStage.COMMITTED.value,
+                "trace": ["commit_task"],
+            }
         task_id = await deps.commit_task(
             {
                 "thread_id": thread_id,
@@ -157,13 +190,17 @@ def build_graph(deps: GraphDeps, *, checkpointer: BaseCheckpointSaver | None = N
         # 返回的是「边上的标签」，不是节点名；映射表在 add_conditional_edges 里。
         if state["intent"] == Intent.CHITCHAT.value:
             return "done"
+        if state["intent"] == Intent.DELETE_TASK.value:
+            return "target"
         if state.get("customer_name"):
             return "customer"
         return "knowledge"
 
     def route_after_draft(state: GraphState) -> str:
         # 只有「建任务」需要人工确认；纯问答问完就答，不打扰用户。
-        if state["intent"] == Intent.CREATE_TASK.value:
+        # [TUTOR-WHY] 判据是「这一轮有没有写动作」，不是「哪几个意图」：
+        # 新增写意图只改这里一处，而不是到处补 if。
+        if state["intent"] in (Intent.CREATE_TASK.value, Intent.DELETE_TASK.value):
             return "confirm"
         return "done"
 
@@ -171,6 +208,7 @@ def build_graph(deps: GraphDeps, *, checkpointer: BaseCheckpointSaver | None = N
     builder.add_node("classify_intent", classify_intent_node)
     builder.add_node("fetch_customer", fetch_customer_node)
     builder.add_node("retrieve_knowledge", retrieve_knowledge_node)
+    builder.add_node("resolve_target", resolve_target_node)
     builder.add_node("draft_advice", draft_advice_node)
     builder.add_node("await_confirm", await_confirm_node)
     builder.add_node("commit_task", commit_task_node)
@@ -179,9 +217,15 @@ def build_graph(deps: GraphDeps, *, checkpointer: BaseCheckpointSaver | None = N
     builder.add_conditional_edges(
         "classify_intent",
         route_after_classify,
-        {"customer": "fetch_customer", "knowledge": "retrieve_knowledge", "done": END},
+        {
+            "customer": "fetch_customer",
+            "target": "resolve_target",
+            "knowledge": "retrieve_knowledge",
+            "done": END,
+        },
     )
     # 知识检索是公共步骤：有客户档案也照样要查政策，两条路径在这里汇合。
+    builder.add_edge("resolve_target", "draft_advice")
     builder.add_edge("fetch_customer", "retrieve_knowledge")
     builder.add_edge("retrieve_knowledge", "draft_advice")
     builder.add_conditional_edges(

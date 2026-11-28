@@ -16,6 +16,8 @@ from app.agent.state import Intent
 from app.core.errors import ValidationError
 
 INTENT_KEYWORDS: dict[Intent, tuple[str, ...]] = {
+    # 「不用提醒我了」里含「提醒我」，所以删除类必须排在创建前面
+    Intent.DELETE_TASK: ("删了", "删掉", "删除", "撤销", "取消待办", "不用提醒"),
     Intent.CREATE_TASK: ("建个待办", "创建任务", "提醒我", "安排一下", "记一下"),
     Intent.ASK_CUSTOMER: ("客户", "线索", "什么阶段", "到期", "保单", "资产", "跟进到哪"),
     Intent.ASK_KNOWLEDGE: ("条款", "理赔", "怎么算", "知识", "流程", "话术", "什么意思"),
