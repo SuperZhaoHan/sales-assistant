@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -22,6 +24,40 @@ ConfirmStatus = Literal["confirmed", "rejected", "expired", "missing"]
 
 HTTP_OK = 200
 HTTP_CONFLICT = 409
+
+
+def decision_key(thread_id: str, approved: bool) -> str:
+    """确认请求的幂等键：**同一线程 + 同一决定** = 同一个请求。
+
+    为什么把 ``approved`` 也算进去：同一个线程先点确认、再点拒绝，是两个不同的
+    请求，结果必然不同；不区分就会把"拒绝"重放成"确认成功"，这是最危险的串味。
+    """
+
+    decision = "yes" if approved else "no"
+    canonical = f"{thread_id}|confirm_task|{decision}"
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _replay(record: Mapping[str, str | None]) -> ConfirmOutcome:
+    """把上次存下的结论原样返回。不读图、不写业务表。"""
+
+    payload = json.loads(record.get("result") or "{}")
+    status = str(payload.get("status") or record.get("status") or "")
+    if status == "expired":
+        return ConfirmOutcome(
+            status="expired",
+            http_status=HTTP_CONFLICT,
+            code="CONFIRM_EXPIRED",
+            age_seconds=payload.get("age_seconds"),
+        )
+    if status == "confirmed":
+        return ConfirmOutcome(
+            status="confirmed",
+            http_status=HTTP_OK,
+            code="CONFIRMED",
+            task_id=payload.get("task_id"),
+        )
+    return ConfirmOutcome(status="rejected", http_status=HTTP_OK, code="REJECTED")
 
 
 class GraphLike(Protocol):
@@ -71,6 +107,12 @@ async def confirm_task(
     任何一步放在恢复之后，都等于「先跑起来再说」，超时就失去了意义。
     """
 
+    # ① 先查「这个请求是不是已经处理过」——重放要返回原结果，不是 409
+    idem_key = decision_key(thread_id, approved)
+    recorded = store.get_decision(idem_key)
+    if recorded is not None:
+        return _replay(recorded)
+
     config = thread_config(thread_id)
     snapshot = await graph.aget_state(config)
 
@@ -95,12 +137,6 @@ async def confirm_task(
 
     if age > ttl_seconds:
         # 超时的处置是「拒绝」，不是「等等再说」：人可能早就走了
-        store.record_action(
-            thread_id=thread_id,
-            kind="confirm_task",
-            status="expired",
-            detail=f"age={age:.1f}s > ttl={ttl_seconds}s",
-        )
         # [TUTOR-WHY] 只返回 409 不给线程收尾，interrupt 会永远挂在 checkpointer 里：
         # [TUTOR-WHY] 列表页一直显示「待确认」、人反复点、对账数字虚高。
         # 所以照样 resume(False)：走「拒绝」分支到终态，interrupt 自然清空，且不会写任务。
@@ -111,6 +147,15 @@ async def confirm_task(
                 "超时拒绝分支产生了任务，resume(False) 语义已损坏",
                 details={"thread_id": thread_id},
             )
+        # [TUTOR-WHY] 结论在动作成功之后才落库：先记结果再执行，一旦执行失败，
+        # 重放就会永远拿一个"没发生过的成功"。
+        store.save_decision(
+            thread_id=thread_id,
+            idem_key=idem_key,
+            status="expired",
+            detail=f"age={age:.1f}s > ttl={ttl_seconds}s",
+            result=json.dumps({"status": "expired", "age_seconds": round(age, 1)}),
+        )
         return ConfirmOutcome(
             status="expired",
             http_status=HTTP_CONFLICT,
@@ -120,16 +165,27 @@ async def confirm_task(
 
     final = await graph.ainvoke(resume(approved), config)
     if final.get("stage") == "committed":
-        store.record_action(thread_id=thread_id, kind="confirm_task", status="confirmed")
+        task_id = final.get("task_id")
+        store.save_decision(
+            thread_id=thread_id,
+            idem_key=idem_key,
+            status="confirmed",
+            result=json.dumps({"status": "confirmed", "task_id": task_id}),
+        )
         return ConfirmOutcome(
             status="confirmed",
             http_status=HTTP_OK,
             code="CONFIRMED",
-            task_id=final.get("task_id"),
+            task_id=task_id,
             age_seconds=age,
         )
 
-    store.record_action(thread_id=thread_id, kind="confirm_task", status="rejected")
+    store.save_decision(
+        thread_id=thread_id,
+        idem_key=idem_key,
+        status="rejected",
+        result=json.dumps({"status": "rejected"}),
+    )
     return ConfirmOutcome(
         status="rejected",
         http_status=HTTP_OK,

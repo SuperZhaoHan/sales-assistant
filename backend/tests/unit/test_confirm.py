@@ -119,7 +119,9 @@ async def test_unknown_thread_has_no_pending_confirm(store: CustomerStore, graph
     assert store.count_actions() == 0
 
 
-async def test_second_confirm_after_done_does_not_write_again(store: CustomerStore, graph) -> None:
+async def test_second_confirm_replays_first_result(store: CustomerStore, graph) -> None:
+    """2.5：同一确认重放，返回原任务号，不是 409、不是新任务。"""
+
     requested = await start(graph, "t-24-twice")
     first = await confirm_task(graph, store, "t-24-twice", True, ttl_seconds=TTL, now=requested + 1)
     second = await confirm_task(
@@ -127,5 +129,58 @@ async def test_second_confirm_after_done_does_not_write_again(store: CustomerSto
     )
 
     assert first.status == "confirmed"
-    assert second.status == "missing", "已经处理过的线程没有待确认项"
+    assert second.status == "confirmed", "重放必须返回成功，而不是「没有待确认」"
+    assert second.task_id == first.task_id
+    assert second.http_status == 200
+    assert store.count_tasks() == 1
+    assert len(store.list_actions("t-24-twice")) == 1, "重放不该多写一行审计"
+
+
+async def test_replay_three_times_keeps_one_row(store: CustomerStore, graph) -> None:
+    requested = await start(graph, "t-25-replay")
+
+    ids = [
+        (
+            await confirm_task(
+                graph, store, "t-25-replay", True, ttl_seconds=TTL, now=requested + 1
+            )
+        ).task_id
+        for _ in range(3)
+    ]
+
+    assert len(set(ids)) == 1
+    assert store.count_tasks() == 1
+    assert len(store.list_actions("t-25-replay")) == 1
+
+
+async def test_expired_replay_returns_expired_not_missing(store: CustomerStore, graph) -> None:
+    """超时后再点一次：仍然是 409 expired（原结果），不是 409 missing（像没这回事）。"""
+
+    requested = await start(graph, "t-25-late")
+    first = await confirm_task(
+        graph, store, "t-25-late", True, ttl_seconds=TTL, now=requested + TTL + 1
+    )
+    second = await confirm_task(
+        graph, store, "t-25-late", True, ttl_seconds=TTL, now=requested + TTL + 2
+    )
+
+    assert first.status == "expired"
+    assert second.status == "expired"
+    assert second.code == "CONFIRM_EXPIRED"
+    assert store.count_tasks() == 0
+
+
+async def test_opposite_decision_is_a_different_request(store: CustomerStore, graph) -> None:
+    """确认之后再点「拒绝」不是重放：幂等键里带了决定，两个请求不同。"""
+
+    requested = await start(graph, "t-25-opposite")
+    first = await confirm_task(
+        graph, store, "t-25-opposite", True, ttl_seconds=TTL, now=requested + 1
+    )
+    second = await confirm_task(
+        graph, store, "t-25-opposite", False, ttl_seconds=TTL, now=requested + 2
+    )
+
+    assert first.status == "confirmed"
+    assert second.status == "missing"
     assert store.count_tasks() == 1

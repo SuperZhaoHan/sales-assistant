@@ -56,10 +56,13 @@ CREATE TABLE IF NOT EXISTS actions (
     kind TEXT NOT NULL,
     status TEXT NOT NULL,
     detail TEXT,
+    idem_key TEXT,
+    result TEXT,
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_customer ON tasks(customer_name);
 CREATE INDEX IF NOT EXISTS idx_actions_thread ON actions(thread_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_actions_idem ON actions(idem_key) WHERE idem_key IS NOT NULL;
 """
 
 # 白名单：表名/列名不参与 SQL 拼接，静态扫描（bandit B608）也不会报
@@ -124,6 +127,7 @@ class CustomerStore:
         conn = sqlite3.connect(self._path, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         conn.executescript(SCHEMA)
+        self._ensure_action_columns(conn)
         conn.commit()
         self._conn = conn
         return self
@@ -133,6 +137,19 @@ class CustomerStore:
         if self._conn is None:
             raise ValidationError("存储未打开：先调 open()", details={"store": self._path})
         return self._conn
+
+    @staticmethod
+    def _ensure_action_columns(conn: sqlite3.Connection) -> None:
+        """给老库补 ``actions`` 的新列：``CREATE TABLE IF NOT EXISTS`` 只对新库生效。
+
+        这是最小可用的迁移：只加列、不改列、不删列，跑多少次都幂等。
+        """
+
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(actions)").fetchall()}
+        if "idem_key" not in columns:
+            conn.execute("ALTER TABLE actions ADD COLUMN idem_key TEXT")
+        if "result" not in columns:
+            conn.execute("ALTER TABLE actions ADD COLUMN result TEXT")
 
     def close(self) -> None:
         if self._conn is not None:
@@ -324,6 +341,47 @@ class CustomerStore:
             )
             self.conn.commit()
         return action_id
+
+    def save_decision(
+        self,
+        *,
+        thread_id: str,
+        idem_key: str,
+        status: str,
+        result: str,
+        detail: str | None = None,
+    ) -> dict[str, str | None]:
+        """把「这次确认的结论」按幂等键存下来；重放时原样读回去。
+
+        id 由幂等键派生 + ``INSERT OR IGNORE``：同一请求写两次只有一行，
+        且**第一次的结果不被覆盖**——重放要的是"原结果"，不是"最新结果"。
+        """
+
+        decision_id = "act-" + hashlib.sha256(idem_key.encode("utf-8")).hexdigest()[:12]
+        with self._lock:
+            self.conn.execute(
+                "INSERT OR IGNORE INTO actions "
+                "(id, thread_id, kind, status, detail, idem_key, result, created_at) "
+                "VALUES (?, ?, 'confirm_task', ?, ?, ?, ?, ?)",
+                (
+                    decision_id,
+                    thread_id,
+                    status,
+                    detail,
+                    idem_key,
+                    result,
+                    datetime.now(UTC).isoformat(timespec="seconds"),
+                ),
+            )
+            self.conn.commit()
+        decision = self.get_decision(idem_key)
+        if decision is None:
+            raise ValidationError("决策写入后查不到", details={"idem_key": idem_key})
+        return decision
+
+    def get_decision(self, idem_key: str) -> dict[str, str | None] | None:
+        row = self.conn.execute("SELECT * FROM actions WHERE idem_key = ?", (idem_key,)).fetchone()
+        return dict(row) if row is not None else None
 
     def list_actions(self, thread_id: str | None = None) -> tuple[dict[str, str | None], ...]:
         if thread_id is None:

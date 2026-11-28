@@ -50,6 +50,13 @@ async def main() -> None:
         ok = await confirm_task(graph, store, "t-24-fast", True, ttl_seconds=TTL, now=requested + 1)
         confirm_ms = (time.perf_counter() - started) * 1000
 
+        started = time.perf_counter()
+        replays = [
+            await confirm_task(graph, store, "t-24-fast", True, ttl_seconds=TTL, now=requested + 2)
+            for _ in range(3)
+        ]
+        replay_ms = (time.perf_counter() - started) * 1000
+
         await pause(graph, "t-24-slow")
         started = time.perf_counter()
         late = await confirm_task(
@@ -60,6 +67,9 @@ async def main() -> None:
         print(f"TTL 内确认          {confirm_ms:6.1f} ms  status={ok.status}")
         print(f"  tasks={store.count_tasks()}")
         print(f"超时确认（默认拒绝）  {expired_ms:6.1f} ms  status={late.status} code={late.code}")
+        same = len({item.task_id for item in replays}) == 1
+        print(f"重放 3 次           {replay_ms:6.1f} ms  status={replays[0].status}")
+        print(f"  同一个任务号={same}  tasks={store.count_tasks()}  审计={store.count_actions()}")
         print(f"任务行数            {store.count_tasks()}   审计行数 {store.count_actions()}")
         store.close()
 
