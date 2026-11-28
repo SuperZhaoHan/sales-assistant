@@ -22,7 +22,7 @@ jobs:
           cache: pip
           cache-dependency-path: backend/pyproject.toml
       - name: Install
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,graph]"
       - name: End-to-end and contract tests
         run: pytest -m "e2e or contract"
       - name: Dependency audit

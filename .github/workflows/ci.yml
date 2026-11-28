@@ -26,7 +26,7 @@ jobs:
           cache: pip
           cache-dependency-path: backend/pyproject.toml
       - name: Install
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,graph]"
       - name: Ruff
         run: |
           ruff check src tests
@@ -52,7 +52,7 @@ jobs:
           cache: pip
           cache-dependency-path: backend/pyproject.toml
       - name: Install
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,graph]"
       - name: Tests
         run: pytest -m "unit or integration" --cov=src/app --cov-report=term-missing --cov-report=xml
       - name: Upload coverage
@@ -75,7 +75,7 @@ jobs:
           cache: pip
           cache-dependency-path: backend/pyproject.toml
       - name: Install
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,graph]"
       - name: Bandit
         run: bandit -q -r src
       - name: Dependency audit
